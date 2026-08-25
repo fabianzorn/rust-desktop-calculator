@@ -10,10 +10,32 @@ The calculator currently supports:
 - Subtraction
 - Multiplication
 - Division
+- Sign toggle (`±`)
+- Percent calculations (`%`)
+- Square roots (`√`)
+- Squaring (`x²`)
 - Decimal numbers
 - Clearing and deleting input
 - Chained calculations
-- Division-by-zero error handling
+- Keyboard controls
+- Error handling for division by zero and square roots of negative numbers
+
+## Keyboard controls
+
+The calculator can be operated with the mouse or keyboard:
+
+| Key | Action |
+| --- | --- |
+| `0`-`9` | Enter digits |
+| `.` or `,` | Enter a decimal point |
+| `+`, `-`, `*`, `/` | Select a binary operation |
+| `Enter` or `=` | Calculate the result |
+| `Backspace` | Delete the last digit |
+| `Escape` or `Delete` | Clear the calculator |
+| `%` | Convert the current value to a percentage |
+| `R` | Calculate the square root |
+| `S` | Square the current value |
+| `N` | Toggle the sign |
 
 ## Requirements
 

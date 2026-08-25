@@ -1,9 +1,9 @@
 use eframe::egui::{self, Align, Button, Color32, Layout, RichText, Vec2};
 
-use crate::calculator::{CalculationError, Operator, calculate};
+use crate::calculator::{CalculationError, Operator, UnaryOperator, calculate, calculate_unary};
 
-const MIN_WINDOW_SIZE: [f32; 2] = [340.0, 560.0];
-const START_WINDOW_SIZE: [f32; 2] = [380.0, 620.0];
+const MIN_WINDOW_SIZE: [f32; 2] = [340.0, 650.0];
+const START_WINDOW_SIZE: [f32; 2] = [380.0, 700.0];
 const MIN_CALCULATOR_WIDTH: f32 = 300.0;
 const MAX_CALCULATOR_WIDTH: f32 = 420.0;
 const BUTTON_GAP: f32 = 9.0;
@@ -50,6 +50,10 @@ impl Default for CalculatorApp {
 impl eframe::App for CalculatorApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         ui.ctx().set_visuals(egui::Visuals::dark());
+
+        for key in keyboard_keys(ui.ctx()) {
+            self.handle_key(key);
+        }
 
         egui::Frame::default()
             .fill(Color32::from_rgb(17, 22, 29))
@@ -138,6 +142,15 @@ impl CalculatorApp {
         self.show_button_row(
             ui,
             &[
+                Key::UnaryOperator(UnaryOperator::ToggleSign),
+                Key::UnaryOperator(UnaryOperator::Percent),
+                Key::UnaryOperator(UnaryOperator::SquareRoot),
+                Key::UnaryOperator(UnaryOperator::Square),
+            ],
+        );
+        self.show_button_row(
+            ui,
+            &[
                 Key::Clear,
                 Key::Backspace,
                 Key::Decimal,
@@ -207,6 +220,7 @@ impl CalculatorApp {
             Key::Number(number) => self.append_number(number),
             Key::Decimal => self.append_decimal(),
             Key::Operator(operator) => self.choose_operator(operator),
+            Key::UnaryOperator(operator) => self.apply_unary_operator(operator),
             Key::Equals => self.calculate_result(),
             Key::Backspace => self.backspace(),
             Key::Clear => self.clear(),
@@ -276,7 +290,7 @@ impl CalculatorApp {
         }
 
         let Some(second) = self.current_number() else {
-            self.show_error("Ungueltige Zahl");
+            self.show_error("Invalid number");
             return;
         };
 
@@ -290,7 +304,39 @@ impl CalculatorApp {
                 self.waiting_for_second_value = false;
                 self.has_error = false;
             }
-            Err(CalculationError::DivisionByZero) => self.show_error("Division durch 0"),
+            Err(error) => self.show_calculation_error(error),
+        }
+    }
+
+    fn apply_unary_operator(&mut self, operator: UnaryOperator) {
+        self.clear_error();
+
+        if self.waiting_for_second_value {
+            return;
+        }
+
+        let Some(value) = self.current_number() else {
+            self.show_error("Invalid number");
+            return;
+        };
+
+        let unary_expression = format_unary_expression(value, operator);
+
+        match calculate_unary(value, operator) {
+            Ok(result) => {
+                self.display = format_number(result);
+                self.has_error = false;
+
+                if self.first_value.is_some() && self.operator.is_some() {
+                    self.update_expression();
+                } else {
+                    self.expression = unary_expression;
+                }
+            }
+            Err(error) => {
+                self.expression = unary_expression;
+                self.show_calculation_error(error);
+            }
         }
     }
 
@@ -337,6 +383,13 @@ impl CalculatorApp {
         self.has_error = true;
     }
 
+    fn show_calculation_error(&mut self, error: CalculationError) {
+        match error {
+            CalculationError::DivisionByZero => self.show_error("Cannot divide by zero"),
+            CalculationError::NegativeSquareRoot => self.show_error("Invalid square root"),
+        }
+    }
+
     fn update_expression(&mut self) {
         match (self.first_value, self.operator) {
             (Some(first), Some(operator)) if self.waiting_for_second_value => {
@@ -350,11 +403,12 @@ impl CalculatorApp {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Key {
     Number(char),
     Decimal,
     Operator(Operator),
+    UnaryOperator(UnaryOperator),
     Equals,
     Backspace,
     Clear,
@@ -385,6 +439,17 @@ fn button_for(key: Key, active: bool) -> Button<'static> {
                 Color32::from_rgb(255, 255, 255)
             },
         ),
+        Key::UnaryOperator(operator) => (
+            match operator {
+                UnaryOperator::ToggleSign => "±",
+                UnaryOperator::Percent => "%",
+                UnaryOperator::SquareRoot => "√",
+                UnaryOperator::Square => "x²",
+            }
+            .to_owned(),
+            Color32::from_rgb(67, 80, 95),
+            Color32::from_rgb(246, 249, 252),
+        ),
         Key::Equals => (
             "=".to_owned(),
             Color32::from_rgb(42, 146, 103),
@@ -412,12 +477,69 @@ fn button_for(key: Key, active: bool) -> Button<'static> {
 }
 
 fn format_number(number: f64) -> String {
+    if number == 0.0 {
+        return "0".to_owned();
+    }
+
     let formatted = number.to_string();
 
     if formatted.ends_with(".0") {
         formatted.trim_end_matches(".0").to_owned()
     } else {
         formatted
+    }
+}
+
+fn format_unary_expression(value: f64, operator: UnaryOperator) -> String {
+    let value = format_number(value);
+
+    match operator {
+        UnaryOperator::ToggleSign => format!("-({value})"),
+        UnaryOperator::Percent => format!("{value}%"),
+        UnaryOperator::SquareRoot => format!("√({value})"),
+        UnaryOperator::Square => format!("({value})²"),
+    }
+}
+
+fn keyboard_keys(context: &egui::Context) -> Vec<Key> {
+    context.input(|input| {
+        let mut keys = input
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                egui::Event::Text(text) => text.chars().filter_map(key_from_character).next(),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        if input.key_pressed(egui::Key::Enter) {
+            keys.push(Key::Equals);
+        }
+        if input.key_pressed(egui::Key::Backspace) {
+            keys.push(Key::Backspace);
+        }
+        if input.key_pressed(egui::Key::Escape) || input.key_pressed(egui::Key::Delete) {
+            keys.push(Key::Clear);
+        }
+
+        keys
+    })
+}
+
+fn key_from_character(character: char) -> Option<Key> {
+    match character {
+        '0'..='9' => Some(Key::Number(character)),
+        '.' | ',' => Some(Key::Decimal),
+        '+' => Some(Key::Operator(Operator::Add)),
+        '-' => Some(Key::Operator(Operator::Subtract)),
+        '*' | '×' => Some(Key::Operator(Operator::Multiply)),
+        '/' | '÷' => Some(Key::Operator(Operator::Divide)),
+        '=' => Some(Key::Equals),
+        '%' => Some(Key::UnaryOperator(UnaryOperator::Percent)),
+        'r' | 'R' => Some(Key::UnaryOperator(UnaryOperator::SquareRoot)),
+        's' | 'S' => Some(Key::UnaryOperator(UnaryOperator::Square)),
+        'n' | 'N' => Some(Key::UnaryOperator(UnaryOperator::ToggleSign)),
+        _ => None,
     }
 }
 
@@ -625,7 +747,7 @@ mod tests {
             ],
         );
 
-        assert_eq!(app.display, "Division durch 0");
+        assert_eq!(app.display, "Cannot divide by zero");
         assert_eq!(app.expression, "8 / 0");
         assert!(app.has_error);
         assert_eq!(app.first_value, None);
@@ -763,6 +885,147 @@ mod tests {
     }
 
     #[test]
+    fn toggles_the_sign_of_the_displayed_number() {
+        let mut app = CalculatorApp::default();
+
+        press_keys(
+            &mut app,
+            &[
+                Key::Number('4'),
+                Key::UnaryOperator(UnaryOperator::ToggleSign),
+            ],
+        );
+
+        assert_eq!(app.display, "-4");
+        assert_eq!(app.expression, "-(4)");
+
+        app.handle_key(Key::UnaryOperator(UnaryOperator::ToggleSign));
+
+        assert_eq!(app.display, "4");
+        assert_eq!(app.expression, "-(-4)");
+    }
+
+    #[test]
+    fn converts_number_to_percentage() {
+        let mut app = CalculatorApp::default();
+
+        press_keys(
+            &mut app,
+            &[
+                Key::Number('2'),
+                Key::Number('5'),
+                Key::UnaryOperator(UnaryOperator::Percent),
+            ],
+        );
+
+        assert_eq!(app.display, "0.25");
+        assert_eq!(app.expression, "25%");
+    }
+
+    #[test]
+    fn calculates_square_root() {
+        let mut app = CalculatorApp::default();
+
+        press_keys(
+            &mut app,
+            &[
+                Key::Number('8'),
+                Key::Number('1'),
+                Key::UnaryOperator(UnaryOperator::SquareRoot),
+            ],
+        );
+
+        assert_eq!(app.display, "9");
+        assert_eq!(app.expression, "√(81)");
+        assert!(!app.has_error);
+    }
+
+    #[test]
+    fn calculates_square() {
+        let mut app = CalculatorApp::default();
+
+        press_keys(
+            &mut app,
+            &[
+                Key::Number('1'),
+                Key::Number('2'),
+                Key::UnaryOperator(UnaryOperator::Square),
+            ],
+        );
+
+        assert_eq!(app.display, "144");
+        assert_eq!(app.expression, "(12)²");
+    }
+
+    #[test]
+    fn shows_error_for_square_root_of_negative_number() {
+        let mut app = CalculatorApp::default();
+
+        press_keys(
+            &mut app,
+            &[
+                Key::Number('4'),
+                Key::UnaryOperator(UnaryOperator::ToggleSign),
+                Key::UnaryOperator(UnaryOperator::SquareRoot),
+            ],
+        );
+
+        assert_eq!(app.display, "Invalid square root");
+        assert_eq!(app.expression, "√(-4)");
+        assert!(app.has_error);
+    }
+
+    #[test]
+    fn applies_unary_operation_to_second_operand() {
+        let mut app = CalculatorApp::default();
+
+        press_keys(
+            &mut app,
+            &[
+                Key::Number('1'),
+                Key::Number('0'),
+                Key::Operator(Operator::Add),
+                Key::Number('2'),
+                Key::Number('5'),
+                Key::UnaryOperator(UnaryOperator::Percent),
+                Key::Equals,
+            ],
+        );
+
+        assert_eq!(app.display, "10.25");
+        assert_eq!(app.expression, "10 + 0.25");
+    }
+
+    #[test]
+    fn unary_operation_while_waiting_for_operand_is_noop() {
+        let mut app = CalculatorApp::default();
+
+        press_keys(
+            &mut app,
+            &[
+                Key::Number('8'),
+                Key::Operator(Operator::Add),
+                Key::UnaryOperator(UnaryOperator::Square),
+            ],
+        );
+
+        assert_eq!(app.display, "8");
+        assert_eq!(app.expression, "8 +");
+        assert!(app.waiting_for_second_value);
+    }
+
+    #[test]
+    fn maps_keyboard_characters_to_calculator_keys() {
+        assert_eq!(key_from_character('7'), Some(Key::Number('7')));
+        assert_eq!(key_from_character('+'), Some(Key::Operator(Operator::Add)));
+        assert_eq!(
+            key_from_character('r'),
+            Some(Key::UnaryOperator(UnaryOperator::SquareRoot))
+        );
+        assert_eq!(key_from_character('x'), None);
+    }
+
+    #[test]
     fn formats_integer_results_without_decimal_suffix() {
         assert_eq!(format_number(12.0), "12");
     }
@@ -770,6 +1033,11 @@ mod tests {
     #[test]
     fn keeps_fractional_results() {
         assert_eq!(format_number(2.5), "2.5");
+    }
+
+    #[test]
+    fn normalizes_negative_zero() {
+        assert_eq!(format_number(-0.0), "0");
     }
 
     #[test]
