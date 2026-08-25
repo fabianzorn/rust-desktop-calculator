@@ -1,3 +1,5 @@
+//! Desktop window configuration and UI module composition.
+
 mod formatting;
 mod input;
 mod state;
@@ -10,6 +12,12 @@ use self::view::CalculatorApp;
 const MIN_WINDOW_SIZE: [f32; 2] = [340.0, 650.0];
 const START_WINDOW_SIZE: [f32; 2] = [380.0, 700.0];
 
+/// Creates and runs the native calculator window.
+///
+/// # Errors
+///
+/// Returns an [`eframe::Error`] if the native window cannot be created or the
+/// application runtime fails.
 pub fn run() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()

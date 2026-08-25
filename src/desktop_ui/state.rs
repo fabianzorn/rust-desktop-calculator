@@ -1,8 +1,11 @@
+//! Calculator interaction state independent of egui rendering.
+
 use crate::calculator::{CalculationError, Operator, UnaryOperator, calculate, calculate_unary};
 
 use super::formatting::{format_number, format_unary_expression};
 use super::input::Key;
 
+/// Owns the displayed values and any pending arithmetic operation.
 pub(super) struct CalculatorState {
     first_value: Option<f64>,
     operator: Option<Operator>,
@@ -26,18 +29,22 @@ impl Default for CalculatorState {
 }
 
 impl CalculatorState {
+    /// Returns the value or error message shown in the main display.
     pub(super) fn display(&self) -> &str {
         &self.display
     }
 
+    /// Returns the arithmetic expression shown above the main display.
     pub(super) fn expression(&self) -> &str {
         &self.expression
     }
 
+    /// Reports whether the main display currently contains an error.
     pub(super) fn has_error(&self) -> bool {
         self.has_error
     }
 
+    /// Applies one button or keyboard action to the calculator state.
     pub(super) fn handle_key(&mut self, key: Key) {
         match key {
             Key::Number(number) => self.append_number(number),
@@ -50,6 +57,7 @@ impl CalculatorState {
         }
     }
 
+    /// Reports whether `key` represents the pending binary operator.
     pub(super) fn is_active_operator(&self, key: Key) -> bool {
         matches!(
             (key, self.operator, self.waiting_for_second_value),

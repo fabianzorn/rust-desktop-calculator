@@ -1,5 +1,8 @@
+//! Formatting helpers for values and expressions shown by the UI.
+
 use crate::calculator::UnaryOperator;
 
+/// Formats a numeric result for the main calculator display.
 pub(super) fn format_number(number: f64) -> String {
     if number == 0.0 {
         return "0".to_owned();
@@ -14,6 +17,7 @@ pub(super) fn format_number(number: f64) -> String {
     }
 }
 
+/// Formats a unary operation for the expression display.
 pub(super) fn format_unary_expression(value: f64, operator: UnaryOperator) -> String {
     let value = format_number(value);
 
@@ -25,6 +29,10 @@ pub(super) fn format_unary_expression(value: f64, operator: UnaryOperator) -> St
     }
 }
 
+/// Returns a non-empty placeholder for an empty expression.
+///
+/// Keeping one blank character prevents the display layout from changing
+/// height while no expression is active.
 pub(super) fn display_expression(expression: &str) -> &str {
     if expression.is_empty() {
         " "
@@ -33,6 +41,7 @@ pub(super) fn display_expression(expression: &str) -> &str {
     }
 }
 
+/// Chooses a font size that keeps long values inside the display.
 pub(super) fn display_size(display: &str) -> f32 {
     if display.len() > 15 {
         25.0

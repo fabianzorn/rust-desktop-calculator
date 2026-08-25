@@ -1,20 +1,33 @@
+//! Arithmetic operations used by the calculator UI.
+
+/// A binary arithmetic operation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operator {
+    /// Adds the second operand to the first.
     Add,
+    /// Subtracts the second operand from the first.
     Subtract,
+    /// Multiplies both operands.
     Multiply,
+    /// Divides the first operand by the second.
     Divide,
 }
 
+/// An arithmetic operation that acts on a single value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnaryOperator {
+    /// Reverses the sign of the value.
     ToggleSign,
+    /// Divides the value by one hundred.
     Percent,
+    /// Calculates the square root of the value.
     SquareRoot,
+    /// Multiplies the value by itself.
     Square,
 }
 
 impl Operator {
+    /// Returns the symbol used to display this operator.
     pub fn symbol(self) -> char {
         match self {
             Self::Add => '+',
@@ -25,6 +38,11 @@ impl Operator {
     }
 }
 
+/// Applies a binary `operator` to `first` and `second`.
+///
+/// # Errors
+///
+/// Returns [`CalculationError::DivisionByZero`] when dividing by zero.
 pub fn calculate(first: f64, operator: Operator, second: f64) -> Result<f64, CalculationError> {
     match operator {
         Operator::Add => Ok(first + second),
@@ -35,6 +53,12 @@ pub fn calculate(first: f64, operator: Operator, second: f64) -> Result<f64, Cal
     }
 }
 
+/// Applies a unary `operator` to `value`.
+///
+/// # Errors
+///
+/// Returns [`CalculationError::NegativeSquareRoot`] when calculating the
+/// square root of a negative value.
 pub fn calculate_unary(value: f64, operator: UnaryOperator) -> Result<f64, CalculationError> {
     match operator {
         UnaryOperator::ToggleSign => Ok(-value),
@@ -45,9 +69,12 @@ pub fn calculate_unary(value: f64, operator: UnaryOperator) -> Result<f64, Calcu
     }
 }
 
+/// An error produced by an arithmetic operation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CalculationError {
+    /// A division used zero as its second operand.
     DivisionByZero,
+    /// A square root operation received a negative value.
     NegativeSquareRoot,
 }
 

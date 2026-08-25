@@ -1,18 +1,29 @@
+//! Translation of keyboard events into calculator actions.
+
 use eframe::egui;
 
 use crate::calculator::{Operator, UnaryOperator};
 
+/// An action that can be triggered by a calculator button or keyboard input.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Key {
+    /// Enters a decimal digit.
     Number(char),
+    /// Enters the decimal separator.
     Decimal,
+    /// Selects a binary operation.
     Operator(Operator),
+    /// Applies an operation to the currently displayed value.
     UnaryOperator(UnaryOperator),
+    /// Evaluates the pending binary operation.
     Equals,
+    /// Removes the last digit from the current value.
     Backspace,
+    /// Resets the complete calculator state.
     Clear,
 }
 
+/// Collects all calculator actions triggered during the current input frame.
 pub(super) fn keyboard_keys(context: &egui::Context) -> Vec<Key> {
     context.input(|input| {
         let mut keys = input
@@ -38,6 +49,7 @@ pub(super) fn keyboard_keys(context: &egui::Context) -> Vec<Key> {
     })
 }
 
+/// Maps a typed character to its calculator action.
 fn key_from_character(character: char) -> Option<Key> {
     match character {
         '0'..='9' => Some(Key::Number(character)),

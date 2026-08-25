@@ -1,3 +1,5 @@
+//! egui widgets, layout, and visual styling for the calculator.
+
 use eframe::egui::{self, Align, Button, Color32, Layout, RichText, Vec2};
 
 use crate::calculator::{Operator, UnaryOperator};
@@ -11,6 +13,7 @@ const MAX_CALCULATOR_WIDTH: f32 = 420.0;
 const BUTTON_GAP: f32 = 9.0;
 const BUTTON_HEIGHT: f32 = 58.0;
 
+/// Connects the calculator state to the native egui application lifecycle.
 #[derive(Default)]
 pub(super) struct CalculatorApp {
     state: CalculatorState,
@@ -36,6 +39,7 @@ impl eframe::App for CalculatorApp {
 }
 
 impl CalculatorApp {
+    /// Renders the calculator container and all of its sections.
     fn show_calculator(&mut self, ui: &mut egui::Ui) {
         let calculator_width =
             (ui.available_width() - 40.0).clamp(MIN_CALCULATOR_WIDTH, MAX_CALCULATOR_WIDTH);
@@ -55,6 +59,7 @@ impl CalculatorApp {
             });
     }
 
+    /// Renders the current expression and result display.
     fn show_display(&self, ui: &mut egui::Ui) {
         egui::Frame::default()
             .fill(Color32::from_rgb(11, 17, 24))
@@ -88,6 +93,7 @@ impl CalculatorApp {
             });
     }
 
+    /// Renders all calculator button rows.
     fn show_buttons(&mut self, ui: &mut egui::Ui) {
         self.show_button_row(
             ui,
@@ -137,6 +143,7 @@ impl CalculatorApp {
         self.show_button_row(ui, &[Key::Number('0'), Key::Equals]);
     }
 
+    /// Renders one row of buttons and forwards clicks to the state.
     fn show_button_row(&mut self, ui: &mut egui::Ui, keys: &[Key]) {
         let single_width = (ui.available_width() - (BUTTON_GAP * 3.0)) / 4.0;
         let double_width = (single_width * 2.0) + BUTTON_GAP;
@@ -166,6 +173,7 @@ impl CalculatorApp {
     }
 }
 
+/// Renders the title and UI framework label.
 fn show_header(ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.label(
@@ -185,6 +193,7 @@ fn show_header(ui: &mut egui::Ui) {
     });
 }
 
+/// Creates a styled button for a calculator action.
 fn button_for(key: Key, active: bool) -> Button<'static> {
     let (label, color, text_color) = match key {
         Key::Number(number) => (
@@ -247,6 +256,7 @@ fn button_for(key: Key, active: bool) -> Button<'static> {
         .corner_radius(10.0)
 }
 
+/// Returns the background color used by number and decimal buttons.
 fn key_color() -> Color32 {
     Color32::from_rgb(49, 61, 74)
 }
