@@ -1,3 +1,8 @@
+mod calculator;
+mod desktop_ui;
+
 fn main() {
-    println!("Hello, world!");
+    if let Err(error) = desktop_ui::run() {
+        eprintln!("Error while starting the Desktop-UI: {error}");
+    }
 }
