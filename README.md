@@ -14,6 +14,9 @@ The calculator currently supports:
 - Percent calculations (`%`)
 - Square roots (`√`)
 - Squaring (`x²`)
+- Sine calculations in degrees (`sin`)
+- Cosine calculations in degrees (`cos`)
+- Tangent calculations in degrees (`tan`)
 - Decimal numbers
 - Clearing and deleting input
 - Chained calculations
@@ -36,6 +39,9 @@ The calculator can be operated with the mouse or keyboard:
 | `R` | Calculate the square root |
 | `S` | Square the current value |
 | `N` | Toggle the sign |
+| `I` | Calculate the sine in degrees |
+| `C` | Calculate the cosine in degrees |
+| `T` | Calculate the tangent in degrees |
 
 ## Requirements
 

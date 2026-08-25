@@ -63,6 +63,9 @@ fn key_from_character(character: char) -> Option<Key> {
         'r' | 'R' => Some(Key::UnaryOperator(UnaryOperator::SquareRoot)),
         's' | 'S' => Some(Key::UnaryOperator(UnaryOperator::Square)),
         'n' | 'N' => Some(Key::UnaryOperator(UnaryOperator::ToggleSign)),
+        'i' | 'I' => Some(Key::UnaryOperator(UnaryOperator::Sine)),
+        'c' | 'C' => Some(Key::UnaryOperator(UnaryOperator::Cosine)),
+        't' | 'T' => Some(Key::UnaryOperator(UnaryOperator::Tangent)),
         _ => None,
     }
 }
@@ -78,6 +81,18 @@ mod tests {
         assert_eq!(
             key_from_character('r'),
             Some(Key::UnaryOperator(UnaryOperator::SquareRoot))
+        );
+        assert_eq!(
+            key_from_character('i'),
+            Some(Key::UnaryOperator(UnaryOperator::Sine))
+        );
+        assert_eq!(
+            key_from_character('c'),
+            Some(Key::UnaryOperator(UnaryOperator::Cosine))
+        );
+        assert_eq!(
+            key_from_character('t'),
+            Some(Key::UnaryOperator(UnaryOperator::Tangent))
         );
         assert_eq!(key_from_character('x'), None);
     }

@@ -24,6 +24,12 @@ pub enum UnaryOperator {
     SquareRoot,
     /// Multiplies the value by itself.
     Square,
+    /// Calculates the sine of an angle in degrees.
+    Sine,
+    /// Calculates the cosine of an angle in degrees.
+    Cosine,
+    /// Calculates the tangent of an angle in degrees.
+    Tangent,
 }
 
 impl Operator {
@@ -57,8 +63,8 @@ pub fn calculate(first: f64, operator: Operator, second: f64) -> Result<f64, Cal
 ///
 /// # Errors
 ///
-/// Returns [`CalculationError::NegativeSquareRoot`] when calculating the
-/// square root of a negative value.
+/// Returns an error when calculating the square root of a negative value or
+/// the tangent of an angle at which it is undefined.
 pub fn calculate_unary(value: f64, operator: UnaryOperator) -> Result<f64, CalculationError> {
     match operator {
         UnaryOperator::ToggleSign => Ok(-value),
@@ -66,7 +72,25 @@ pub fn calculate_unary(value: f64, operator: UnaryOperator) -> Result<f64, Calcu
         UnaryOperator::SquareRoot if value < 0.0 => Err(CalculationError::NegativeSquareRoot),
         UnaryOperator::SquareRoot => Ok(value.sqrt()),
         UnaryOperator::Square => Ok(value.powi(2)),
+        UnaryOperator::Sine => Ok(round_trigonometric_result(value.to_radians().sin())),
+        UnaryOperator::Cosine => Ok(round_trigonometric_result(value.to_radians().cos())),
+        UnaryOperator::Tangent if tangent_is_undefined(value) => {
+            Err(CalculationError::UndefinedTangent)
+        }
+        UnaryOperator::Tangent => Ok(round_trigonometric_result(value.to_radians().tan())),
     }
+}
+
+/// Reports whether the tangent is undefined for an angle in degrees.
+fn tangent_is_undefined(degrees: f64) -> bool {
+    degrees.to_radians().cos().abs() < f64::EPSILON.sqrt()
+}
+
+/// Rounds small floating-point artifacts produced by trigonometric functions.
+fn round_trigonometric_result(value: f64) -> f64 {
+    const PRECISION: f64 = 1_000_000_000_000.0;
+
+    (value * PRECISION).round() / PRECISION
 }
 
 /// An error produced by an arithmetic operation.
@@ -76,6 +100,8 @@ pub enum CalculationError {
     DivisionByZero,
     /// A square root operation received a negative value.
     NegativeSquareRoot,
+    /// A tangent operation received an angle whose cosine is zero.
+    UndefinedTangent,
 }
 
 #[cfg(test)]
@@ -137,5 +163,35 @@ mod tests {
     #[test]
     fn calculates_square() {
         assert_eq!(calculate_unary(12.0, UnaryOperator::Square), Ok(144.0));
+    }
+
+    #[test]
+    fn calculates_sine_in_degrees() {
+        assert_eq!(calculate_unary(30.0, UnaryOperator::Sine), Ok(0.5));
+        assert_eq!(calculate_unary(90.0, UnaryOperator::Sine), Ok(1.0));
+    }
+
+    #[test]
+    fn calculates_cosine_in_degrees() {
+        assert_eq!(calculate_unary(60.0, UnaryOperator::Cosine), Ok(0.5));
+        assert_eq!(calculate_unary(180.0, UnaryOperator::Cosine), Ok(-1.0));
+    }
+
+    #[test]
+    fn calculates_tangent_in_degrees() {
+        assert_eq!(calculate_unary(45.0, UnaryOperator::Tangent), Ok(1.0));
+        assert_eq!(calculate_unary(180.0, UnaryOperator::Tangent), Ok(0.0));
+    }
+
+    #[test]
+    fn rejects_tangent_at_undefined_angles() {
+        assert_eq!(
+            calculate_unary(90.0, UnaryOperator::Tangent),
+            Err(CalculationError::UndefinedTangent)
+        );
+        assert_eq!(
+            calculate_unary(270.0, UnaryOperator::Tangent),
+            Err(CalculationError::UndefinedTangent)
+        );
     }
 }

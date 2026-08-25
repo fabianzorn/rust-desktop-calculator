@@ -98,6 +98,14 @@ impl CalculatorApp {
         self.show_button_row(
             ui,
             &[
+                Key::UnaryOperator(UnaryOperator::Sine),
+                Key::UnaryOperator(UnaryOperator::Cosine),
+                Key::UnaryOperator(UnaryOperator::Tangent),
+            ],
+        );
+        self.show_button_row(
+            ui,
+            &[
                 Key::UnaryOperator(UnaryOperator::ToggleSign),
                 Key::UnaryOperator(UnaryOperator::Percent),
                 Key::UnaryOperator(UnaryOperator::SquareRoot),
@@ -145,22 +153,16 @@ impl CalculatorApp {
 
     /// Renders one row of buttons and forwards clicks to the state.
     fn show_button_row(&mut self, ui: &mut egui::Ui, keys: &[Key]) {
-        let single_width = (ui.available_width() - (BUTTON_GAP * 3.0)) / 4.0;
-        let double_width = (single_width * 2.0) + BUTTON_GAP;
+        let gaps_width = BUTTON_GAP * keys.len().saturating_sub(1) as f32;
+        let button_width = (ui.available_width() - gaps_width) / keys.len() as f32;
 
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing = Vec2::splat(BUTTON_GAP);
 
             for key in keys {
-                let width = if matches!(key, Key::Number('0') | Key::Equals) {
-                    double_width
-                } else {
-                    single_width
-                };
-
                 if ui
                     .add_sized(
-                        [width, BUTTON_HEIGHT],
+                        [button_width, BUTTON_HEIGHT],
                         button_for(*key, self.state.is_active_operator(*key)),
                     )
                     .clicked()
@@ -225,6 +227,9 @@ fn button_for(key: Key, active: bool) -> Button<'static> {
                 UnaryOperator::Percent => "%",
                 UnaryOperator::SquareRoot => "√",
                 UnaryOperator::Square => "x²",
+                UnaryOperator::Sine => "sin",
+                UnaryOperator::Cosine => "cos",
+                UnaryOperator::Tangent => "tan",
             }
             .to_owned(),
             Color32::from_rgb(67, 80, 95),

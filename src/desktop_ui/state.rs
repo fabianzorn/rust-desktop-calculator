@@ -207,6 +207,7 @@ impl CalculatorState {
         match error {
             CalculationError::DivisionByZero => self.show_error("Cannot divide by zero"),
             CalculationError::NegativeSquareRoot => self.show_error("Invalid square root"),
+            CalculationError::UndefinedTangent => self.show_error("Undefined tangent"),
         }
     }
 
@@ -570,6 +571,67 @@ mod tests {
         );
         assert_eq!(state.display, "144");
         assert_eq!(state.expression, "(12)²");
+    }
+
+    #[test]
+    fn calculates_sine_in_degrees() {
+        let mut state = CalculatorState::default();
+        press_keys(
+            &mut state,
+            &[
+                Key::Number('3'),
+                Key::Number('0'),
+                Key::UnaryOperator(UnaryOperator::Sine),
+            ],
+        );
+        assert_eq!(state.display, "0.5");
+        assert_eq!(state.expression, "sin(30°)");
+    }
+
+    #[test]
+    fn calculates_cosine_in_degrees() {
+        let mut state = CalculatorState::default();
+        press_keys(
+            &mut state,
+            &[
+                Key::Number('6'),
+                Key::Number('0'),
+                Key::UnaryOperator(UnaryOperator::Cosine),
+            ],
+        );
+        assert_eq!(state.display, "0.5");
+        assert_eq!(state.expression, "cos(60°)");
+    }
+
+    #[test]
+    fn calculates_tangent_in_degrees() {
+        let mut state = CalculatorState::default();
+        press_keys(
+            &mut state,
+            &[
+                Key::Number('4'),
+                Key::Number('5'),
+                Key::UnaryOperator(UnaryOperator::Tangent),
+            ],
+        );
+        assert_eq!(state.display, "1");
+        assert_eq!(state.expression, "tan(45°)");
+    }
+
+    #[test]
+    fn shows_error_for_undefined_tangent() {
+        let mut state = CalculatorState::default();
+        press_keys(
+            &mut state,
+            &[
+                Key::Number('9'),
+                Key::Number('0'),
+                Key::UnaryOperator(UnaryOperator::Tangent),
+            ],
+        );
+        assert_eq!(state.display, "Undefined tangent");
+        assert_eq!(state.expression, "tan(90°)");
+        assert!(state.has_error);
     }
 
     #[test]

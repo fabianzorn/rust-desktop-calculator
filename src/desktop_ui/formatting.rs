@@ -26,6 +26,9 @@ pub(super) fn format_unary_expression(value: f64, operator: UnaryOperator) -> St
         UnaryOperator::Percent => format!("{value}%"),
         UnaryOperator::SquareRoot => format!("√({value})"),
         UnaryOperator::Square => format!("({value})²"),
+        UnaryOperator::Sine => format!("sin({value}°)"),
+        UnaryOperator::Cosine => format!("cos({value}°)"),
+        UnaryOperator::Tangent => format!("tan({value}°)"),
     }
 }
 
@@ -69,6 +72,22 @@ mod tests {
     #[test]
     fn normalizes_negative_zero() {
         assert_eq!(format_number(-0.0), "0");
+    }
+
+    #[test]
+    fn formats_trigonometric_expressions_in_degrees() {
+        assert_eq!(
+            format_unary_expression(30.0, UnaryOperator::Sine),
+            "sin(30°)"
+        );
+        assert_eq!(
+            format_unary_expression(60.0, UnaryOperator::Cosine),
+            "cos(60°)"
+        );
+        assert_eq!(
+            format_unary_expression(45.0, UnaryOperator::Tangent),
+            "tan(45°)"
+        );
     }
 
     #[test]
