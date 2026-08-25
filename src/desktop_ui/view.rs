@@ -1,0 +1,252 @@
+use eframe::egui::{self, Align, Button, Color32, Layout, RichText, Vec2};
+
+use crate::calculator::{Operator, UnaryOperator};
+
+use super::formatting::{display_expression, display_size};
+use super::input::{Key, keyboard_keys};
+use super::state::CalculatorState;
+
+const MIN_CALCULATOR_WIDTH: f32 = 300.0;
+const MAX_CALCULATOR_WIDTH: f32 = 420.0;
+const BUTTON_GAP: f32 = 9.0;
+const BUTTON_HEIGHT: f32 = 58.0;
+
+#[derive(Default)]
+pub(super) struct CalculatorApp {
+    state: CalculatorState,
+}
+
+impl eframe::App for CalculatorApp {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        ui.ctx().set_visuals(egui::Visuals::dark());
+
+        for key in keyboard_keys(ui.ctx()) {
+            self.state.handle_key(key);
+        }
+
+        egui::Frame::default()
+            .fill(Color32::from_rgb(17, 22, 29))
+            .show(ui, |ui| {
+                ui.with_layout(Layout::top_down(Align::Center), |ui| {
+                    ui.add_space(20.0);
+                    self.show_calculator(ui);
+                });
+            });
+    }
+}
+
+impl CalculatorApp {
+    fn show_calculator(&mut self, ui: &mut egui::Ui) {
+        let calculator_width =
+            (ui.available_width() - 40.0).clamp(MIN_CALCULATOR_WIDTH, MAX_CALCULATOR_WIDTH);
+
+        egui::Frame::default()
+            .fill(Color32::from_rgb(35, 43, 53))
+            .stroke(egui::Stroke::new(1.0, Color32::from_rgb(58, 70, 84)))
+            .corner_radius(14.0)
+            .inner_margin(18.0)
+            .show(ui, |ui| {
+                ui.set_width(calculator_width);
+                show_header(ui);
+                ui.add_space(14.0);
+                self.show_display(ui);
+                ui.add_space(14.0);
+                self.show_buttons(ui);
+            });
+    }
+
+    fn show_display(&self, ui: &mut egui::Ui) {
+        egui::Frame::default()
+            .fill(Color32::from_rgb(11, 17, 24))
+            .stroke(egui::Stroke::new(1.0, Color32::from_rgb(61, 76, 90)))
+            .corner_radius(10.0)
+            .inner_margin(16.0)
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.set_min_height(90.0);
+                ui.with_layout(Layout::top_down(Align::RIGHT), |ui| {
+                    ui.label(
+                        RichText::new(display_expression(self.state.expression()))
+                            .color(Color32::from_rgb(143, 164, 183))
+                            .size(14.0),
+                    );
+
+                    let display_color = if self.state.has_error() {
+                        Color32::from_rgb(255, 189, 189)
+                    } else {
+                        Color32::from_rgb(247, 251, 255)
+                    };
+
+                    ui.add_space(8.0);
+                    ui.label(
+                        RichText::new(self.state.display())
+                            .color(display_color)
+                            .size(display_size(self.state.display()))
+                            .strong(),
+                    );
+                });
+            });
+    }
+
+    fn show_buttons(&mut self, ui: &mut egui::Ui) {
+        self.show_button_row(
+            ui,
+            &[
+                Key::UnaryOperator(UnaryOperator::ToggleSign),
+                Key::UnaryOperator(UnaryOperator::Percent),
+                Key::UnaryOperator(UnaryOperator::SquareRoot),
+                Key::UnaryOperator(UnaryOperator::Square),
+            ],
+        );
+        self.show_button_row(
+            ui,
+            &[
+                Key::Clear,
+                Key::Backspace,
+                Key::Decimal,
+                Key::Operator(Operator::Divide),
+            ],
+        );
+        self.show_button_row(
+            ui,
+            &[
+                Key::Number('7'),
+                Key::Number('8'),
+                Key::Number('9'),
+                Key::Operator(Operator::Multiply),
+            ],
+        );
+        self.show_button_row(
+            ui,
+            &[
+                Key::Number('4'),
+                Key::Number('5'),
+                Key::Number('6'),
+                Key::Operator(Operator::Subtract),
+            ],
+        );
+        self.show_button_row(
+            ui,
+            &[
+                Key::Number('1'),
+                Key::Number('2'),
+                Key::Number('3'),
+                Key::Operator(Operator::Add),
+            ],
+        );
+        self.show_button_row(ui, &[Key::Number('0'), Key::Equals]);
+    }
+
+    fn show_button_row(&mut self, ui: &mut egui::Ui, keys: &[Key]) {
+        let single_width = (ui.available_width() - (BUTTON_GAP * 3.0)) / 4.0;
+        let double_width = (single_width * 2.0) + BUTTON_GAP;
+
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing = Vec2::splat(BUTTON_GAP);
+
+            for key in keys {
+                let width = if matches!(key, Key::Number('0') | Key::Equals) {
+                    double_width
+                } else {
+                    single_width
+                };
+
+                if ui
+                    .add_sized(
+                        [width, BUTTON_HEIGHT],
+                        button_for(*key, self.state.is_active_operator(*key)),
+                    )
+                    .clicked()
+                {
+                    self.state.handle_key(*key);
+                }
+            }
+        });
+        ui.add_space(8.0);
+    }
+}
+
+fn show_header(ui: &mut egui::Ui) {
+    ui.horizontal(|ui| {
+        ui.label(
+            RichText::new("Calculator")
+                .color(Color32::from_rgb(244, 248, 251))
+                .size(20.0)
+                .strong(),
+        );
+
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            ui.label(
+                RichText::new("egui")
+                    .color(Color32::from_rgb(133, 151, 169))
+                    .size(12.0),
+            );
+        });
+    });
+}
+
+fn button_for(key: Key, active: bool) -> Button<'static> {
+    let (label, color, text_color) = match key {
+        Key::Number(number) => (
+            number.to_string(),
+            key_color(),
+            Color32::from_rgb(246, 249, 252),
+        ),
+        Key::Decimal => (
+            ".".to_owned(),
+            key_color(),
+            Color32::from_rgb(246, 249, 252),
+        ),
+        Key::Operator(operator) => (
+            operator.symbol().to_string(),
+            if active {
+                Color32::from_rgb(244, 248, 251)
+            } else {
+                Color32::from_rgb(238, 135, 65)
+            },
+            if active {
+                Color32::from_rgb(28, 36, 45)
+            } else {
+                Color32::WHITE
+            },
+        ),
+        Key::UnaryOperator(operator) => (
+            match operator {
+                UnaryOperator::ToggleSign => "±",
+                UnaryOperator::Percent => "%",
+                UnaryOperator::SquareRoot => "√",
+                UnaryOperator::Square => "x²",
+            }
+            .to_owned(),
+            Color32::from_rgb(67, 80, 95),
+            Color32::from_rgb(246, 249, 252),
+        ),
+        Key::Equals => (
+            "=".to_owned(),
+            Color32::from_rgb(42, 146, 103),
+            Color32::WHITE,
+        ),
+        Key::Backspace => (
+            "DEL".to_owned(),
+            Color32::from_rgb(67, 80, 95),
+            Color32::from_rgb(246, 249, 252),
+        ),
+        Key::Clear => (
+            "AC".to_owned(),
+            Color32::from_rgb(150, 70, 78),
+            Color32::from_rgb(255, 245, 245),
+        ),
+    };
+
+    Button::new(RichText::new(label).color(text_color).size(20.0).strong())
+        .fill(color)
+        .stroke(egui::Stroke::new(
+            1.0,
+            Color32::from_rgba_unmultiplied(255, 255, 255, 24),
+        ))
+        .corner_radius(10.0)
+}
+
+fn key_color() -> Color32 {
+    Color32::from_rgb(49, 61, 74)
+}

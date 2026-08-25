@@ -127,7 +127,12 @@ cargo build --locked --release
 ├── .github/workflows/ci.yml  # GitHub Actions pipeline
 ├── src/
 │   ├── calculator.rs         # Calculation logic and related tests
-│   ├── desktop_ui.rs         # Desktop UI, input handling, and UI tests
+│   ├── desktop_ui.rs         # Desktop UI module entry point and window setup
+│   ├── desktop_ui/
+│   │   ├── formatting.rs     # Number, expression, and display formatting
+│   │   ├── input.rs          # Keyboard input and calculator key mapping
+│   │   ├── state.rs          # Calculator state, interactions, and related tests
+│   │   └── view.rs           # egui layout, controls, and styling
 │   └── main.rs               # Application entry point
 ├── Cargo.toml                # Package metadata and dependencies
 └── rust-toolchain.toml       # Rust version and components
