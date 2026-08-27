@@ -162,6 +162,8 @@ impl CalculatorApp {
                 Key::MemoryRecall,
                 Key::MemoryAdd,
                 Key::MemorySubtract,
+                Key::OpenParenthesis,
+                Key::CloseParenthesis,
             ],
         );
         self.show_button_row(
@@ -334,6 +336,15 @@ fn button_for(key: Key, active: bool, angle_mode: AngleMode) -> Button<'static> 
             Color32::from_rgb(55, 91, 112),
             Color32::from_rgb(226, 241, 249),
         ),
+        Key::OpenParenthesis | Key::CloseParenthesis => (
+            if key == Key::OpenParenthesis {
+                "(".to_owned()
+            } else {
+                ")".to_owned()
+            },
+            Color32::from_rgb(67, 80, 95),
+            Color32::from_rgb(246, 249, 252),
+        ),
         Key::Equals => (
             "=".to_owned(),
             Color32::from_rgb(42, 146, 103),
@@ -402,6 +413,8 @@ fn tooltip_for(key: Key) -> String {
         Key::MemoryRecall => "Recall memory (Ctrl+R)".to_owned(),
         Key::MemoryAdd => "Add display to memory (Ctrl+P)".to_owned(),
         Key::MemorySubtract => "Subtract display from memory (Ctrl+Q)".to_owned(),
+        Key::OpenParenthesis => "Open parenthesis — key: (".to_owned(),
+        Key::CloseParenthesis => "Close parenthesis — key: )".to_owned(),
         Key::Equals => "Calculate result (Enter or =)".to_owned(),
         Key::Backspace => "Delete last digit (Backspace)".to_owned(),
         Key::Clear => "Clear calculator (Escape or Delete)".to_owned(),

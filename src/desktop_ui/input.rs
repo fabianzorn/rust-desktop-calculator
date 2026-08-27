@@ -25,6 +25,10 @@ pub(super) enum Key {
     MemoryAdd,
     /// Subtracts the displayed value from calculator memory.
     MemorySubtract,
+    /// Opens a grouped sub-expression.
+    OpenParenthesis,
+    /// Closes and evaluates the current grouped sub-expression.
+    CloseParenthesis,
     /// Evaluates the pending binary operation.
     Equals,
     /// Removes the last digit from the current value.
@@ -108,6 +112,8 @@ fn key_from_character(character: char) -> Option<Key> {
         'f' | 'F' => Some(Key::UnaryOperator(UnaryOperator::Factorial)),
         'p' | 'P' => Some(Key::Constant(MathematicalConstant::Pi)),
         'k' | 'K' => Some(Key::Constant(MathematicalConstant::Euler)),
+        '(' => Some(Key::OpenParenthesis),
+        ')' => Some(Key::CloseParenthesis),
         _ => None,
     }
 }
@@ -169,6 +175,8 @@ mod tests {
             key_from_character('k'),
             Some(Key::Constant(MathematicalConstant::Euler))
         );
+        assert_eq!(key_from_character('('), Some(Key::OpenParenthesis));
+        assert_eq!(key_from_character(')'), Some(Key::CloseParenthesis));
         assert_eq!(key_from_character('x'), None);
     }
 }

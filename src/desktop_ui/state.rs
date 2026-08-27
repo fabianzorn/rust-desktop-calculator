@@ -10,6 +10,13 @@ use super::input::Key;
 
 const MAX_INPUT_LENGTH: usize = 18;
 
+/// Arithmetic state suspended while a parenthesized expression is evaluated.
+struct ParenthesisContext {
+    first_value: Option<f64>,
+    operator: Option<Operator>,
+    prefix: String,
+}
+
 /// Owns the displayed values and any pending arithmetic operation.
 pub(super) struct CalculatorState {
     first_value: Option<f64>,
@@ -20,6 +27,9 @@ pub(super) struct CalculatorState {
     has_error: bool,
     angle_mode: AngleMode,
     memory: f64,
+    parentheses: Vec<ParenthesisContext>,
+    value_entered: bool,
+    grouped_operand: bool,
 }
 
 impl Default for CalculatorState {
@@ -33,6 +43,9 @@ impl Default for CalculatorState {
             has_error: false,
             angle_mode: AngleMode::default(),
             memory: 0.0,
+            parentheses: Vec::new(),
+            value_entered: false,
+            grouped_operand: false,
         }
     }
 }
@@ -75,6 +88,8 @@ impl CalculatorState {
             Key::MemoryRecall => self.recall_memory(),
             Key::MemoryAdd => self.update_memory(1.0),
             Key::MemorySubtract => self.update_memory(-1.0),
+            Key::OpenParenthesis => self.open_parenthesis(),
+            Key::CloseParenthesis => self.close_parenthesis(),
             Key::Equals => self.calculate_result(),
             Key::Backspace => self.backspace(),
             Key::Clear => self.clear(),
@@ -103,6 +118,8 @@ impl CalculatorState {
             self.display.push(number);
         }
 
+        self.value_entered = true;
+        self.grouped_operand = false;
         self.update_expression();
     }
 
@@ -116,6 +133,8 @@ impl CalculatorState {
             self.display.push('.');
         }
 
+        self.value_entered = true;
+        self.grouped_operand = false;
         self.update_expression();
     }
 
@@ -129,6 +148,7 @@ impl CalculatorState {
         self.first_value = self.current_number();
         self.operator = Some(next_operator);
         self.waiting_for_second_value = true;
+        self.grouped_operand = false;
         self.update_expression();
     }
 
@@ -147,7 +167,9 @@ impl CalculatorState {
             return;
         };
 
-        self.expression = format!("{first} {} {second}", operator.symbol());
+        if !self.grouped_operand {
+            self.update_expression();
+        }
 
         match calculate(first, operator, second) {
             Ok(result) => {
@@ -156,6 +178,8 @@ impl CalculatorState {
                 self.operator = None;
                 self.waiting_for_second_value = false;
                 self.has_error = false;
+                self.value_entered = true;
+                self.grouped_operand = false;
             }
             Err(error) => self.show_calculation_error(error),
         }
@@ -178,15 +202,17 @@ impl CalculatorState {
             Ok(result) => {
                 self.display = format_number(result);
                 self.has_error = false;
+                self.value_entered = true;
+                self.grouped_operand = false;
 
                 if self.first_value.is_some() && self.operator.is_some() {
                     self.update_expression();
                 } else {
-                    self.expression = unary_expression;
+                    self.set_standalone_expression(unary_expression);
                 }
             }
             Err(error) => {
-                self.expression = unary_expression;
+                self.set_standalone_expression(unary_expression);
                 self.show_calculation_error(error);
             }
         }
@@ -195,6 +221,8 @@ impl CalculatorState {
     fn insert_constant(&mut self, constant: MathematicalConstant) {
         self.clear_error();
         self.display = format_number(constant.value());
+        self.value_entered = true;
+        self.grouped_operand = false;
 
         if self.waiting_for_second_value {
             self.waiting_for_second_value = false;
@@ -202,7 +230,7 @@ impl CalculatorState {
         } else if self.first_value.is_some() && self.operator.is_some() {
             self.update_expression();
         } else {
-            self.expression = constant.symbol().to_owned();
+            self.set_standalone_expression(constant.symbol().to_owned());
         }
     }
 
@@ -218,13 +246,15 @@ impl CalculatorState {
         }
 
         self.display = format_number(self.memory);
+        self.value_entered = true;
+        self.grouped_operand = false;
         if self.waiting_for_second_value {
             self.waiting_for_second_value = false;
             self.update_expression();
         } else if self.first_value.is_some() && self.operator.is_some() {
             self.update_expression();
         } else {
-            self.expression = "MR".to_owned();
+            self.set_standalone_expression("MR".to_owned());
         }
     }
 
@@ -240,6 +270,72 @@ impl CalculatorState {
         if updated.is_finite() {
             self.memory = updated;
         }
+    }
+
+    fn set_standalone_expression(&mut self, expression: String) {
+        if let Some(context) = self.parentheses.last() {
+            self.expression = format!("{}{expression}", context.prefix);
+        } else {
+            self.expression = expression;
+        }
+    }
+
+    fn open_parenthesis(&mut self) {
+        self.clear_error();
+
+        if self.value_entered && !self.waiting_for_second_value {
+            return;
+        }
+
+        let prefix = if self.expression.is_empty() {
+            "(".to_owned()
+        } else {
+            format!("{} (", self.expression)
+        };
+        self.parentheses.push(ParenthesisContext {
+            first_value: self.first_value,
+            operator: self.operator,
+            prefix: prefix.clone(),
+        });
+        self.first_value = None;
+        self.operator = None;
+        self.display = "0".to_owned();
+        self.expression = prefix;
+        self.waiting_for_second_value = false;
+        self.value_entered = false;
+        self.grouped_operand = false;
+    }
+
+    fn close_parenthesis(&mut self) {
+        if self.has_error
+            || self.parentheses.is_empty()
+            || !self.value_entered
+            || self.waiting_for_second_value
+        {
+            return;
+        }
+
+        if self.operator.is_some() {
+            self.calculate_result();
+            if self.has_error {
+                return;
+            }
+        }
+
+        let result = self.current_number().unwrap_or_default();
+        let context = self.parentheses.pop().expect("parenthesis checked above");
+        let inner_expression = self
+            .expression
+            .strip_prefix(&context.prefix)
+            .unwrap_or(self.display())
+            .to_owned();
+        self.first_value = context.first_value;
+        self.operator = context.operator;
+        self.display = format_number(result);
+        self.expression = format!("{}{inner_expression})", context.prefix);
+        self.waiting_for_second_value = false;
+        self.value_entered = true;
+        self.grouped_operand = true;
     }
 
     fn backspace(&mut self) {
@@ -307,14 +403,21 @@ impl CalculatorState {
     }
 
     fn update_expression(&mut self) {
-        match (self.first_value, self.operator) {
+        let local_expression = match (self.first_value, self.operator) {
             (Some(first), Some(operator)) if self.waiting_for_second_value => {
-                self.expression = format!("{first} {}", operator.symbol());
+                format!("{first} {}", operator.symbol())
             }
             (Some(first), Some(operator)) => {
-                self.expression = format!("{first} {} {}", operator.symbol(), self.display);
+                format!("{first} {} {}", operator.symbol(), self.display)
             }
-            _ => self.expression.clear(),
+            _ if self.value_entered && !self.parentheses.is_empty() => self.display.clone(),
+            _ => String::new(),
+        };
+
+        if let Some(context) = self.parentheses.last() {
+            self.expression = format!("{}{local_expression}", context.prefix);
+        } else {
+            self.expression = local_expression;
         }
     }
 }
@@ -352,6 +455,8 @@ mod tests {
         assert_eq!(state.angle_mode, AngleMode::Degrees);
         assert_eq!(state.memory, 0.0);
         assert!(!state.has_memory());
+        assert!(state.parentheses.is_empty());
+        assert!(!state.value_entered);
     }
 
     #[test]
@@ -508,6 +613,72 @@ mod tests {
         );
         assert_eq!(state.display, "256");
         assert_eq!(state.expression, "2 ^ 8");
+    }
+
+    #[test]
+    fn calculates_parenthesized_expression() {
+        let mut state = CalculatorState::default();
+        press_keys(
+            &mut state,
+            &[
+                Key::Number('2'),
+                Key::Operator(Operator::Multiply),
+                Key::OpenParenthesis,
+                Key::Number('3'),
+                Key::Operator(Operator::Add),
+                Key::Number('4'),
+                Key::CloseParenthesis,
+                Key::Equals,
+            ],
+        );
+
+        assert_eq!(state.display, "14");
+        assert_eq!(state.expression, "2 * (3 + 4)");
+        assert!(state.parentheses.is_empty());
+    }
+
+    #[test]
+    fn calculates_nested_parentheses() {
+        let mut state = CalculatorState::default();
+        press_keys(
+            &mut state,
+            &[
+                Key::Number('2'),
+                Key::Operator(Operator::Add),
+                Key::OpenParenthesis,
+                Key::Number('3'),
+                Key::Operator(Operator::Multiply),
+                Key::OpenParenthesis,
+                Key::Number('4'),
+                Key::Operator(Operator::Add),
+                Key::Number('1'),
+                Key::CloseParenthesis,
+                Key::CloseParenthesis,
+                Key::Equals,
+            ],
+        );
+
+        assert_eq!(state.display, "17");
+        assert_eq!(state.expression, "2 + (3 * (4 + 1))");
+        assert!(state.parentheses.is_empty());
+    }
+
+    #[test]
+    fn ignores_unmatched_or_empty_parentheses() {
+        let mut state = CalculatorState::default();
+        state.handle_key(Key::CloseParenthesis);
+        assert_eq!(state.display, "0");
+        assert_eq!(state.expression, "");
+
+        state.handle_key(Key::OpenParenthesis);
+        state.handle_key(Key::CloseParenthesis);
+        assert_eq!(state.display, "0");
+        assert_eq!(state.expression, "(");
+        assert_eq!(state.parentheses.len(), 1);
+
+        state.handle_key(Key::Clear);
+        assert!(state.parentheses.is_empty());
+        assert_eq!(state.expression, "");
     }
 
     #[test]

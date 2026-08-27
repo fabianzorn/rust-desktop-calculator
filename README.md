@@ -25,6 +25,7 @@ The calculator currently supports:
 - Factorials (`x!`)
 - Mathematical constants (`π`, `e`)
 - Calculator memory (`MC`, `MR`, `M+`, `M−`)
+- Nested parenthesized expressions
 - Switchable degree and radian angle modes (`DEG`/`RAD`)
 - Decimal numbers
 - Clearing and deleting input
@@ -69,6 +70,7 @@ The calculator can be operated with the mouse or keyboard:
 | `Ctrl+R` | Recall calculator memory (`MR`) |
 | `Ctrl+P` | Add the display to memory (`M+`) |
 | `Ctrl+Q` | Subtract the display from memory (`M−`) |
+| `(`, `)` | Open or close a parenthesized expression |
 
 ## Requirements
 
