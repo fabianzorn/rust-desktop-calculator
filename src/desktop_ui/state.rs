@@ -232,6 +232,10 @@ impl CalculatorState {
             CalculationError::DivisionByZero => self.show_error("Cannot divide by zero"),
             CalculationError::NegativeSquareRoot => self.show_error("Invalid square root"),
             CalculationError::UndefinedTangent => self.show_error("Undefined tangent"),
+            CalculationError::InvalidLogarithm => self.show_error("Invalid logarithm"),
+            CalculationError::InvalidPower => self.show_error("Invalid power"),
+            CalculationError::InvalidFactorial => self.show_error("Invalid factorial"),
+            CalculationError::ResultOutOfRange => self.show_error("Result out of range"),
         }
     }
 
@@ -410,6 +414,22 @@ mod tests {
         );
         assert_eq!(state.display, "2");
         assert_eq!(state.expression, "8 / 4");
+    }
+
+    #[test]
+    fn calculates_power() {
+        let mut state = CalculatorState::default();
+        press_keys(
+            &mut state,
+            &[
+                Key::Number('2'),
+                Key::Operator(Operator::Power),
+                Key::Number('8'),
+                Key::Equals,
+            ],
+        );
+        assert_eq!(state.display, "256");
+        assert_eq!(state.expression, "2 ^ 8");
     }
 
     #[test]
@@ -606,6 +626,61 @@ mod tests {
         );
         assert_eq!(state.display, "144");
         assert_eq!(state.expression, "(12)²");
+    }
+
+    #[test]
+    fn calculates_additional_scientific_functions() {
+        let cases = [
+            ("100", UnaryOperator::LogarithmBase10, "2", "log₁₀(100)"),
+            ("1", UnaryOperator::NaturalLogarithm, "0", "ln(1)"),
+            ("0", UnaryOperator::Exponential, "1", "e^(0)"),
+            ("4", UnaryOperator::Reciprocal, "0.25", "1/(4)"),
+            ("5", UnaryOperator::Factorial, "120", "(5)!"),
+        ];
+
+        for (input, operator, result, expression) in cases {
+            let mut state = CalculatorState::default();
+            enter_number(&mut state, input);
+            state.handle_key(Key::UnaryOperator(operator));
+
+            assert_eq!(state.display, result);
+            assert_eq!(state.expression, expression);
+            assert!(!state.has_error);
+        }
+    }
+
+    #[test]
+    fn shows_errors_for_invalid_scientific_function_domains() {
+        let cases = [
+            (
+                "0",
+                UnaryOperator::NaturalLogarithm,
+                "Invalid logarithm",
+                "ln(0)",
+            ),
+            (
+                "0",
+                UnaryOperator::Reciprocal,
+                "Cannot divide by zero",
+                "1/(0)",
+            ),
+            (
+                "1.5",
+                UnaryOperator::Factorial,
+                "Invalid factorial",
+                "(1.5)!",
+            ),
+        ];
+
+        for (input, operator, message, expression) in cases {
+            let mut state = CalculatorState::default();
+            enter_number(&mut state, input);
+            state.handle_key(Key::UnaryOperator(operator));
+
+            assert_eq!(state.display, message);
+            assert_eq!(state.expression, expression);
+            assert!(state.has_error);
+        }
     }
 
     #[test]

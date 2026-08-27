@@ -60,6 +60,7 @@ fn key_from_character(character: char) -> Option<Key> {
         '-' => Some(Key::Operator(Operator::Subtract)),
         '*' | '×' => Some(Key::Operator(Operator::Multiply)),
         '/' | '÷' => Some(Key::Operator(Operator::Divide)),
+        '^' => Some(Key::Operator(Operator::Power)),
         '=' => Some(Key::Equals),
         '%' => Some(Key::UnaryOperator(UnaryOperator::Percent)),
         'r' | 'R' => Some(Key::UnaryOperator(UnaryOperator::SquareRoot)),
@@ -69,6 +70,11 @@ fn key_from_character(character: char) -> Option<Key> {
         'c' | 'C' => Some(Key::UnaryOperator(UnaryOperator::Cosine)),
         't' | 'T' => Some(Key::UnaryOperator(UnaryOperator::Tangent)),
         'm' | 'M' => Some(Key::ToggleAngleMode),
+        'o' | 'O' => Some(Key::UnaryOperator(UnaryOperator::LogarithmBase10)),
+        'l' | 'L' => Some(Key::UnaryOperator(UnaryOperator::NaturalLogarithm)),
+        'e' | 'E' => Some(Key::UnaryOperator(UnaryOperator::Exponential)),
+        'v' | 'V' => Some(Key::UnaryOperator(UnaryOperator::Reciprocal)),
+        'f' | 'F' => Some(Key::UnaryOperator(UnaryOperator::Factorial)),
         _ => None,
     }
 }
@@ -98,6 +104,30 @@ mod tests {
             Some(Key::UnaryOperator(UnaryOperator::Tangent))
         );
         assert_eq!(key_from_character('m'), Some(Key::ToggleAngleMode));
+        assert_eq!(
+            key_from_character('o'),
+            Some(Key::UnaryOperator(UnaryOperator::LogarithmBase10))
+        );
+        assert_eq!(
+            key_from_character('l'),
+            Some(Key::UnaryOperator(UnaryOperator::NaturalLogarithm))
+        );
+        assert_eq!(
+            key_from_character('e'),
+            Some(Key::UnaryOperator(UnaryOperator::Exponential))
+        );
+        assert_eq!(
+            key_from_character('v'),
+            Some(Key::UnaryOperator(UnaryOperator::Reciprocal))
+        );
+        assert_eq!(
+            key_from_character('f'),
+            Some(Key::UnaryOperator(UnaryOperator::Factorial))
+        );
+        assert_eq!(
+            key_from_character('^'),
+            Some(Key::Operator(Operator::Power))
+        );
         assert_eq!(key_from_character('x'), None);
     }
 }

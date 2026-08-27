@@ -9,8 +9,8 @@ use eframe::egui;
 
 use self::view::CalculatorApp;
 
-const MIN_WINDOW_SIZE: [f32; 2] = [340.0, 725.0];
-const START_WINDOW_SIZE: [f32; 2] = [380.0, 775.0];
+const MIN_WINDOW_SIZE: [f32; 2] = [340.0, 790.0];
+const START_WINDOW_SIZE: [f32; 2] = [380.0, 850.0];
 
 /// Creates and runs the native calculator window.
 ///

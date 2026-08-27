@@ -11,6 +11,8 @@ pub enum Operator {
     Multiply,
     /// Divides the first operand by the second.
     Divide,
+    /// Raises the first operand to the power of the second.
+    Power,
 }
 
 /// The unit used to interpret angles in trigonometric operations.
@@ -40,6 +42,16 @@ pub enum UnaryOperator {
     Cosine,
     /// Calculates the tangent of an angle in the selected unit.
     Tangent,
+    /// Calculates the base-10 logarithm of the value.
+    LogarithmBase10,
+    /// Calculates the natural logarithm of the value.
+    NaturalLogarithm,
+    /// Raises Euler's number to the value.
+    Exponential,
+    /// Calculates one divided by the value.
+    Reciprocal,
+    /// Calculates the factorial of a non-negative integer.
+    Factorial,
 }
 
 impl Operator {
@@ -50,6 +62,7 @@ impl Operator {
             Self::Subtract => '-',
             Self::Multiply => '*',
             Self::Divide => '/',
+            Self::Power => '^',
         }
     }
 }
@@ -84,7 +97,8 @@ impl AngleMode {
 ///
 /// # Errors
 ///
-/// Returns [`CalculationError::DivisionByZero`] when dividing by zero.
+/// Returns an error when dividing by zero or when a power has no finite real
+/// result.
 pub fn calculate(first: f64, operator: Operator, second: f64) -> Result<f64, CalculationError> {
     match operator {
         Operator::Add => Ok(first + second),
@@ -92,6 +106,8 @@ pub fn calculate(first: f64, operator: Operator, second: f64) -> Result<f64, Cal
         Operator::Multiply => Ok(first * second),
         Operator::Divide if second == 0.0 => Err(CalculationError::DivisionByZero),
         Operator::Divide => Ok(first / second),
+        Operator::Power if first == 0.0 && second < 0.0 => Err(CalculationError::DivisionByZero),
+        Operator::Power => finite_result(first.powf(second), CalculationError::InvalidPower),
     }
 }
 
@@ -99,8 +115,8 @@ pub fn calculate(first: f64, operator: Operator, second: f64) -> Result<f64, Cal
 ///
 /// # Errors
 ///
-/// Returns an error when calculating the square root of a negative value or
-/// the tangent of an angle at which it is undefined.
+/// Returns an error when the operation is undefined for `value` or its result
+/// is outside the finite range represented by [`f64`].
 pub fn calculate_unary(
     value: f64,
     operator: UnaryOperator,
@@ -118,7 +134,35 @@ pub fn calculate_unary(
             Err(CalculationError::UndefinedTangent)
         }
         UnaryOperator::Tangent => Ok(round_trigonometric_result(angle_mode.radians(value).tan())),
+        UnaryOperator::LogarithmBase10 if value <= 0.0 => Err(CalculationError::InvalidLogarithm),
+        UnaryOperator::LogarithmBase10 => Ok(value.log10()),
+        UnaryOperator::NaturalLogarithm if value <= 0.0 => Err(CalculationError::InvalidLogarithm),
+        UnaryOperator::NaturalLogarithm => Ok(value.ln()),
+        UnaryOperator::Exponential => {
+            finite_result(value.exp(), CalculationError::ResultOutOfRange)
+        }
+        UnaryOperator::Reciprocal if value == 0.0 => Err(CalculationError::DivisionByZero),
+        UnaryOperator::Reciprocal => Ok(value.recip()),
+        UnaryOperator::Factorial if value < 0.0 || value.fract() != 0.0 => {
+            Err(CalculationError::InvalidFactorial)
+        }
+        UnaryOperator::Factorial if value > 170.0 => Err(CalculationError::ResultOutOfRange),
+        UnaryOperator::Factorial => Ok(factorial(value as u32)),
     }
+}
+
+/// Returns a finite calculation result or the supplied domain/range error.
+fn finite_result(result: f64, error: CalculationError) -> Result<f64, CalculationError> {
+    if result.is_finite() {
+        Ok(result)
+    } else {
+        Err(error)
+    }
+}
+
+/// Calculates a factorial that is known to fit into an [`f64`].
+fn factorial(value: u32) -> f64 {
+    (1..=value).fold(1.0, |result, factor| result * f64::from(factor))
 }
 
 /// Reports whether the tangent is undefined for an angle in the selected unit.
@@ -142,6 +186,14 @@ pub enum CalculationError {
     NegativeSquareRoot,
     /// A tangent operation received an angle whose cosine is zero.
     UndefinedTangent,
+    /// A logarithm received zero or a negative value.
+    InvalidLogarithm,
+    /// A power has no finite result in the real number domain.
+    InvalidPower,
+    /// A factorial received a negative or non-integer value.
+    InvalidFactorial,
+    /// A result exceeds the finite range represented by [`f64`].
+    ResultOutOfRange,
 }
 
 #[cfg(test)]
@@ -174,6 +226,24 @@ mod tests {
     fn rejects_division_by_zero() {
         assert_eq!(
             calculate(8.0, Operator::Divide, 0.0),
+            Err(CalculationError::DivisionByZero)
+        );
+    }
+
+    #[test]
+    fn calculates_arbitrary_power() {
+        assert_eq!(calculate(2.0, Operator::Power, 10.0), Ok(1024.0));
+        assert_eq!(calculate(9.0, Operator::Power, 0.5), Ok(3.0));
+    }
+
+    #[test]
+    fn rejects_invalid_power() {
+        assert_eq!(
+            calculate(-2.0, Operator::Power, 0.5),
+            Err(CalculationError::InvalidPower)
+        );
+        assert_eq!(
+            calculate(0.0, Operator::Power, -1.0),
             Err(CalculationError::DivisionByZero)
         );
     }
@@ -219,6 +289,83 @@ mod tests {
         assert_eq!(
             calculate_unary(12.0, UnaryOperator::Square, AngleMode::Degrees),
             Ok(144.0)
+        );
+    }
+
+    #[test]
+    fn calculates_logarithms() {
+        assert_eq!(
+            calculate_unary(1000.0, UnaryOperator::LogarithmBase10, AngleMode::Degrees),
+            Ok(3.0)
+        );
+        assert_eq!(
+            calculate_unary(
+                std::f64::consts::E,
+                UnaryOperator::NaturalLogarithm,
+                AngleMode::Degrees
+            ),
+            Ok(1.0)
+        );
+    }
+
+    #[test]
+    fn rejects_non_positive_logarithm_arguments() {
+        for operator in [
+            UnaryOperator::LogarithmBase10,
+            UnaryOperator::NaturalLogarithm,
+        ] {
+            assert_eq!(
+                calculate_unary(0.0, operator, AngleMode::Degrees),
+                Err(CalculationError::InvalidLogarithm)
+            );
+            assert_eq!(
+                calculate_unary(-1.0, operator, AngleMode::Degrees),
+                Err(CalculationError::InvalidLogarithm)
+            );
+        }
+    }
+
+    #[test]
+    fn calculates_exponential_and_reciprocal() {
+        assert_eq!(
+            calculate_unary(0.0, UnaryOperator::Exponential, AngleMode::Degrees),
+            Ok(1.0)
+        );
+        assert_eq!(
+            calculate_unary(4.0, UnaryOperator::Reciprocal, AngleMode::Degrees),
+            Ok(0.25)
+        );
+        assert_eq!(
+            calculate_unary(0.0, UnaryOperator::Reciprocal, AngleMode::Degrees),
+            Err(CalculationError::DivisionByZero)
+        );
+    }
+
+    #[test]
+    fn calculates_factorials() {
+        assert_eq!(
+            calculate_unary(0.0, UnaryOperator::Factorial, AngleMode::Degrees),
+            Ok(1.0)
+        );
+        assert_eq!(
+            calculate_unary(5.0, UnaryOperator::Factorial, AngleMode::Degrees),
+            Ok(120.0)
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_or_out_of_range_factorials() {
+        assert_eq!(
+            calculate_unary(-1.0, UnaryOperator::Factorial, AngleMode::Degrees),
+            Err(CalculationError::InvalidFactorial)
+        );
+        assert_eq!(
+            calculate_unary(2.5, UnaryOperator::Factorial, AngleMode::Degrees),
+            Err(CalculationError::InvalidFactorial)
+        );
+        assert_eq!(
+            calculate_unary(171.0, UnaryOperator::Factorial, AngleMode::Degrees),
+            Err(CalculationError::ResultOutOfRange)
         );
     }
 

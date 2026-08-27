@@ -37,6 +37,11 @@ pub(super) fn format_unary_expression(
         UnaryOperator::Sine => format!("sin({angle})"),
         UnaryOperator::Cosine => format!("cos({angle})"),
         UnaryOperator::Tangent => format!("tan({angle})"),
+        UnaryOperator::LogarithmBase10 => format!("log₁₀({value})"),
+        UnaryOperator::NaturalLogarithm => format!("ln({value})"),
+        UnaryOperator::Exponential => format!("e^({value})"),
+        UnaryOperator::Reciprocal => format!("1/({value})"),
+        UnaryOperator::Factorial => format!("({value})!"),
     }
 }
 
@@ -103,6 +108,30 @@ mod tests {
         assert_eq!(
             format_unary_expression(1.5, UnaryOperator::Sine, AngleMode::Radians),
             "sin(1.5 rad)"
+        );
+    }
+
+    #[test]
+    fn formats_scientific_expressions() {
+        assert_eq!(
+            format_unary_expression(100.0, UnaryOperator::LogarithmBase10, AngleMode::Degrees),
+            "log₁₀(100)"
+        );
+        assert_eq!(
+            format_unary_expression(2.0, UnaryOperator::NaturalLogarithm, AngleMode::Degrees),
+            "ln(2)"
+        );
+        assert_eq!(
+            format_unary_expression(3.0, UnaryOperator::Exponential, AngleMode::Degrees),
+            "e^(3)"
+        );
+        assert_eq!(
+            format_unary_expression(4.0, UnaryOperator::Reciprocal, AngleMode::Degrees),
+            "1/(4)"
+        );
+        assert_eq!(
+            format_unary_expression(5.0, UnaryOperator::Factorial, AngleMode::Degrees),
+            "(5)!"
         );
     }
 

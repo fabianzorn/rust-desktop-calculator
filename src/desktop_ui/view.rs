@@ -107,8 +107,17 @@ impl CalculatorApp {
         self.show_button_row(
             ui,
             &[
-                Key::UnaryOperator(UnaryOperator::ToggleSign),
-                Key::UnaryOperator(UnaryOperator::Percent),
+                Key::UnaryOperator(UnaryOperator::LogarithmBase10),
+                Key::UnaryOperator(UnaryOperator::NaturalLogarithm),
+                Key::UnaryOperator(UnaryOperator::Exponential),
+                Key::Operator(Operator::Power),
+            ],
+        );
+        self.show_button_row(
+            ui,
+            &[
+                Key::UnaryOperator(UnaryOperator::Reciprocal),
+                Key::UnaryOperator(UnaryOperator::Factorial),
                 Key::UnaryOperator(UnaryOperator::SquareRoot),
                 Key::UnaryOperator(UnaryOperator::Square),
             ],
@@ -116,10 +125,10 @@ impl CalculatorApp {
         self.show_button_row(
             ui,
             &[
+                Key::UnaryOperator(UnaryOperator::ToggleSign),
+                Key::UnaryOperator(UnaryOperator::Percent),
                 Key::Clear,
                 Key::Backspace,
-                Key::Decimal,
-                Key::Operator(Operator::Divide),
             ],
         );
         self.show_button_row(
@@ -128,7 +137,7 @@ impl CalculatorApp {
                 Key::Number('7'),
                 Key::Number('8'),
                 Key::Number('9'),
-                Key::Operator(Operator::Multiply),
+                Key::Operator(Operator::Divide),
             ],
         );
         self.show_button_row(
@@ -137,7 +146,7 @@ impl CalculatorApp {
                 Key::Number('4'),
                 Key::Number('5'),
                 Key::Number('6'),
-                Key::Operator(Operator::Subtract),
+                Key::Operator(Operator::Multiply),
             ],
         );
         self.show_button_row(
@@ -146,10 +155,18 @@ impl CalculatorApp {
                 Key::Number('1'),
                 Key::Number('2'),
                 Key::Number('3'),
+                Key::Operator(Operator::Subtract),
+            ],
+        );
+        self.show_button_row(
+            ui,
+            &[
+                Key::Number('0'),
+                Key::Decimal,
+                Key::Equals,
                 Key::Operator(Operator::Add),
             ],
         );
-        self.show_button_row(ui, &[Key::Number('0'), Key::Equals]);
     }
 
     /// Renders one row of buttons and forwards clicks to the state.
@@ -214,7 +231,11 @@ fn button_for(key: Key, active: bool, angle_mode: AngleMode) -> Button<'static> 
             Color32::from_rgb(246, 249, 252),
         ),
         Key::Operator(operator) => (
-            operator.symbol().to_string(),
+            if operator == Operator::Power {
+                "x^y".to_owned()
+            } else {
+                operator.symbol().to_string()
+            },
             if active {
                 Color32::from_rgb(244, 248, 251)
             } else {
@@ -235,6 +256,11 @@ fn button_for(key: Key, active: bool, angle_mode: AngleMode) -> Button<'static> 
                 UnaryOperator::Sine => "sin",
                 UnaryOperator::Cosine => "cos",
                 UnaryOperator::Tangent => "tan",
+                UnaryOperator::LogarithmBase10 => "log₁₀",
+                UnaryOperator::NaturalLogarithm => "ln",
+                UnaryOperator::Exponential => "e^x",
+                UnaryOperator::Reciprocal => "1/x",
+                UnaryOperator::Factorial => "x!",
             }
             .to_owned(),
             Color32::from_rgb(67, 80, 95),

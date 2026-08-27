@@ -17,12 +17,18 @@ The calculator currently supports:
 - Sine calculations (`sin`)
 - Cosine calculations (`cos`)
 - Tangent calculations (`tan`)
+- Base-10 logarithms (`log₁₀`)
+- Natural logarithms (`ln`)
+- Exponential calculations (`e^x`)
+- Arbitrary powers (`x^y`)
+- Reciprocals (`1/x`)
+- Factorials (`x!`)
 - Switchable degree and radian angle modes (`DEG`/`RAD`)
 - Decimal numbers
 - Clearing and deleting input
 - Chained calculations
 - Keyboard controls
-- Error handling for division by zero, negative square roots, and undefined tangents
+- Error handling for invalid mathematical domains and out-of-range results
 
 ## Keyboard controls
 
@@ -32,7 +38,7 @@ The calculator can be operated with the mouse or keyboard:
 | --- | --- |
 | `0`-`9` | Enter digits |
 | `.` or `,` | Enter a decimal point |
-| `+`, `-`, `*`, `/` | Select a binary operation |
+| `+`, `-`, `*`, `/`, `^` | Select a binary operation |
 | `Enter` or `=` | Calculate the result |
 | `Backspace` | Delete the last digit |
 | `Escape` or `Delete` | Clear the calculator |
@@ -44,6 +50,11 @@ The calculator can be operated with the mouse or keyboard:
 | `C` | Calculate the cosine in the selected angle mode |
 | `T` | Calculate the tangent in the selected angle mode |
 | `M` | Switch between degree and radian mode |
+| `O` | Calculate the base-10 logarithm |
+| `L` | Calculate the natural logarithm |
+| `E` | Calculate e raised to the current value |
+| `V` | Calculate the reciprocal |
+| `F` | Calculate the factorial |
 
 ## Requirements
 
