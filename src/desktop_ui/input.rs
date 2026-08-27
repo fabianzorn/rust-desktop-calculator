@@ -86,6 +86,11 @@ pub(super) fn copy_result_requested(context: &egui::Context) -> bool {
     context.input(|input| input.modifiers.command && input.key_pressed(egui::Key::C))
 }
 
+/// Reports whether the calculator-view mode shortcut was pressed.
+pub(super) fn calculator_mode_toggle_requested(context: &egui::Context) -> bool {
+    context.input(|input| input.key_pressed(egui::Key::F2))
+}
+
 /// Maps a typed character to its calculator action.
 fn key_from_character(character: char) -> Option<Key> {
     match character {

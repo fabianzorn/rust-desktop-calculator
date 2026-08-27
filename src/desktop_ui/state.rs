@@ -76,6 +76,11 @@ impl CalculatorState {
         self.memory != 0.0
     }
 
+    /// Reports whether a parenthesized expression is currently incomplete.
+    pub(super) fn has_open_parentheses(&self) -> bool {
+        !self.parentheses.is_empty()
+    }
+
     /// Applies one button or keyboard action to the calculator state.
     pub(super) fn handle_key(&mut self, key: Key) {
         match key {

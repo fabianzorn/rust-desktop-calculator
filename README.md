@@ -6,6 +6,7 @@ A small desktop calculator written in Rust. The user interface is built with
 
 The calculator currently supports:
 
+- Switchable standard and advanced calculator views
 - Addition
 - Subtraction
 - Multiplication
@@ -37,6 +38,18 @@ The calculator currently supports:
 - Manual input limited to 18 characters
 - Scientific notation for very large and very small results
 - Error handling for invalid mathematical domains and out-of-range results
+
+## Calculator modes
+
+The **standard** view contains the numeric keypad, the four basic arithmetic
+operations, sign and percent controls, and editing actions. The **advanced**
+view additionally exposes scientific operations, constants, memory, angle
+mode, and parentheses. Hidden advanced actions are also disabled for keyboard
+input while standard mode is active.
+
+Use the mode switch above the display or press `F2` to change views. Switching
+to standard mode cancels an incomplete parenthesized expression; completed
+calculations, the selected angle mode, and calculator memory are retained.
 
 ## Keyboard controls
 
@@ -71,6 +84,7 @@ The calculator can be operated with the mouse or keyboard:
 | `Ctrl+P` | Add the display to memory (`M+`) |
 | `Ctrl+Q` | Subtract the display from memory (`M−`) |
 | `(`, `)` | Open or close a parenthesized expression |
+| `F2` | Switch between standard and advanced view |
 
 ## Requirements
 

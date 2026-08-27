@@ -5,7 +5,7 @@ use eframe::egui::{self, Align, Button, Color32, Layout, RichText, Vec2};
 use crate::calculator::{AngleMode, MathematicalConstant, Operator, UnaryOperator};
 
 use super::formatting::{display_expression, display_size};
-use super::input::{Key, copy_result_requested, keyboard_keys};
+use super::input::{Key, calculator_mode_toggle_requested, copy_result_requested, keyboard_keys};
 use super::state::CalculatorState;
 
 const MIN_CALCULATOR_WIDTH: f32 = 300.0;
@@ -14,10 +14,50 @@ const BUTTON_GAP: f32 = 9.0;
 const BUTTON_HEIGHT: f32 = 52.0;
 const BUTTON_ROW_GAP: f32 = 6.0;
 
+/// Controls which set of calculator functions is visible and available.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum CalculatorMode {
+    /// Shows only the controls expected from a basic calculator.
+    #[default]
+    Standard,
+    /// Shows memory, grouping, constants, and scientific operations.
+    Advanced,
+}
+
+impl CalculatorMode {
+    /// Reports whether a calculator key is available in this mode.
+    fn allows(self, key: Key) -> bool {
+        match self {
+            Self::Advanced => true,
+            Self::Standard => matches!(
+                key,
+                Key::Number(_)
+                    | Key::Decimal
+                    | Key::Operator(
+                        Operator::Add | Operator::Subtract | Operator::Multiply | Operator::Divide
+                    )
+                    | Key::UnaryOperator(UnaryOperator::ToggleSign | UnaryOperator::Percent)
+                    | Key::Equals
+                    | Key::Backspace
+                    | Key::Clear
+            ),
+        }
+    }
+
+    /// Returns the other available calculator mode.
+    fn toggled(self) -> Self {
+        match self {
+            Self::Standard => Self::Advanced,
+            Self::Advanced => Self::Standard,
+        }
+    }
+}
+
 /// Connects the calculator state to the native egui application lifecycle.
 #[derive(Default)]
 pub(super) struct CalculatorApp {
     state: CalculatorState,
+    mode: CalculatorMode,
 }
 
 impl eframe::App for CalculatorApp {
@@ -27,9 +67,14 @@ impl eframe::App for CalculatorApp {
         if copy_result_requested(ui.ctx()) {
             self.copy_result(ui.ctx());
         }
+        if calculator_mode_toggle_requested(ui.ctx()) {
+            self.set_mode(self.mode.toggled());
+        }
 
         for key in keyboard_keys(ui.ctx()) {
-            self.state.handle_key(key);
+            if self.mode.allows(key) {
+                self.state.handle_key(key);
+            }
         }
 
         egui::Frame::default()
@@ -44,6 +89,14 @@ impl eframe::App for CalculatorApp {
 }
 
 impl CalculatorApp {
+    /// Changes the available controls and safely cancels an inaccessible open group.
+    fn set_mode(&mut self, mode: CalculatorMode) {
+        if mode == CalculatorMode::Standard && self.state.has_open_parentheses() {
+            self.state.handle_key(Key::Clear);
+        }
+        self.mode = mode;
+    }
+
     /// Copies the displayed result unless the calculator currently shows an error.
     fn copy_result(&self, context: &egui::Context) {
         if !self.state.has_error() {
@@ -78,15 +131,7 @@ impl CalculatorApp {
                     self.copy_result(ui.ctx());
                 }
 
-                ui.label(
-                    RichText::new(format!("ANGLE: {}", self.state.angle_mode().label()))
-                        .color(Color32::from_rgb(115, 183, 235))
-                        .size(12.0)
-                        .strong(),
-                )
-                .on_hover_text("Active angle mode (M to switch)");
-
-                if self.state.has_memory() {
+                if self.mode == CalculatorMode::Advanced && self.state.has_memory() {
                     ui.label(
                         RichText::new("M")
                             .color(Color32::from_rgb(126, 214, 168))
@@ -95,7 +140,43 @@ impl CalculatorApp {
                     )
                     .on_hover_text("Calculator memory contains a value");
                 }
+
+                if self.mode == CalculatorMode::Advanced {
+                    ui.label(
+                        RichText::new(format!("ANGLE: {}", self.state.angle_mode().label()))
+                            .color(Color32::from_rgb(115, 183, 235))
+                            .size(12.0)
+                            .strong(),
+                    )
+                    .on_hover_text("Active angle mode (M to switch)");
+                }
             });
+        });
+    }
+
+    /// Renders the switch between the basic and expanded control sets.
+    fn show_mode_switch(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label(
+                RichText::new("MODE")
+                    .color(Color32::from_rgb(143, 164, 183))
+                    .size(12.0)
+                    .strong(),
+            );
+
+            let standard = ui
+                .selectable_label(self.mode == CalculatorMode::Standard, "STANDARD")
+                .on_hover_text("Show basic calculator controls (F2)");
+            if standard.clicked() {
+                self.set_mode(CalculatorMode::Standard);
+            }
+
+            let advanced = ui
+                .selectable_label(self.mode == CalculatorMode::Advanced, "ADVANCED")
+                .on_hover_text("Show scientific calculator controls (F2)");
+            if advanced.clicked() {
+                self.set_mode(CalculatorMode::Advanced);
+            }
         });
     }
 
@@ -112,7 +193,9 @@ impl CalculatorApp {
             .show(ui, |ui| {
                 ui.set_width(calculator_width);
                 self.show_header(ui);
-                ui.add_space(14.0);
+                ui.add_space(8.0);
+                self.show_mode_switch(ui);
+                ui.add_space(12.0);
                 self.show_display(ui);
                 ui.add_space(14.0);
                 self.show_buttons(ui);
@@ -155,6 +238,25 @@ impl CalculatorApp {
 
     /// Renders all calculator button rows.
     fn show_buttons(&mut self, ui: &mut egui::Ui) {
+        if self.mode == CalculatorMode::Advanced {
+            self.show_advanced_button_rows(ui);
+        } else {
+            self.show_button_row(
+                ui,
+                &[
+                    Key::UnaryOperator(UnaryOperator::ToggleSign),
+                    Key::UnaryOperator(UnaryOperator::Percent),
+                    Key::Clear,
+                    Key::Backspace,
+                ],
+            );
+        }
+
+        self.show_number_button_rows(ui);
+    }
+
+    /// Renders controls available only in advanced mode.
+    fn show_advanced_button_rows(&mut self, ui: &mut egui::Ui) {
         self.show_button_row(
             ui,
             &[
@@ -204,6 +306,10 @@ impl CalculatorApp {
                 Key::Backspace,
             ],
         );
+    }
+
+    /// Renders the numeric keypad shared by both calculator modes.
+    fn show_number_button_rows(&mut self, ui: &mut egui::Ui) {
         self.show_button_row(
             ui,
             &[
@@ -425,4 +531,61 @@ fn tooltip_for(key: Key) -> String {
 /// Returns the background color used by number and decimal buttons.
 fn key_color() -> Color32 {
     Color32::from_rgb(49, 61, 74)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn standard_mode_allows_only_basic_calculator_keys() {
+        let mode = CalculatorMode::Standard;
+
+        assert!(mode.allows(Key::Number('7')));
+        assert!(mode.allows(Key::Operator(Operator::Add)));
+        assert!(mode.allows(Key::Operator(Operator::Multiply)));
+        assert!(mode.allows(Key::UnaryOperator(UnaryOperator::Percent)));
+        assert!(mode.allows(Key::Clear));
+
+        assert!(!mode.allows(Key::Operator(Operator::Power)));
+        assert!(!mode.allows(Key::UnaryOperator(UnaryOperator::Sine)));
+        assert!(!mode.allows(Key::Constant(MathematicalConstant::Pi)));
+        assert!(!mode.allows(Key::MemoryRecall));
+        assert!(!mode.allows(Key::OpenParenthesis));
+        assert!(!mode.allows(Key::ToggleAngleMode));
+    }
+
+    #[test]
+    fn advanced_mode_allows_scientific_calculator_keys() {
+        let mode = CalculatorMode::Advanced;
+
+        assert!(mode.allows(Key::Operator(Operator::Power)));
+        assert!(mode.allows(Key::UnaryOperator(UnaryOperator::Sine)));
+        assert!(mode.allows(Key::Constant(MathematicalConstant::Pi)));
+        assert!(mode.allows(Key::MemoryRecall));
+        assert!(mode.allows(Key::OpenParenthesis));
+        assert!(mode.allows(Key::ToggleAngleMode));
+    }
+
+    #[test]
+    fn calculator_starts_in_standard_mode() {
+        let app = CalculatorApp::default();
+        assert_eq!(app.mode, CalculatorMode::Standard);
+    }
+
+    #[test]
+    fn switching_to_standard_cancels_an_open_group() {
+        let mut app = CalculatorApp {
+            mode: CalculatorMode::Advanced,
+            ..CalculatorApp::default()
+        };
+        app.state.handle_key(Key::OpenParenthesis);
+        assert!(app.state.has_open_parentheses());
+
+        app.set_mode(CalculatorMode::Standard);
+
+        assert_eq!(app.mode, CalculatorMode::Standard);
+        assert!(!app.state.has_open_parentheses());
+        assert_eq!(app.state.display(), "0");
+    }
 }
