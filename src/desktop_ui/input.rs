@@ -2,7 +2,7 @@
 
 use eframe::egui;
 
-use crate::calculator::{Operator, UnaryOperator};
+use crate::calculator::{MathematicalConstant, Operator, UnaryOperator};
 
 /// An action that can be triggered by a calculator button or keyboard input.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -15,6 +15,8 @@ pub(super) enum Key {
     Operator(Operator),
     /// Applies an operation to the currently displayed value.
     UnaryOperator(UnaryOperator),
+    /// Enters a mathematical constant.
+    Constant(MathematicalConstant),
     /// Evaluates the pending binary operation.
     Equals,
     /// Removes the last digit from the current value.
@@ -75,6 +77,8 @@ fn key_from_character(character: char) -> Option<Key> {
         'e' | 'E' => Some(Key::UnaryOperator(UnaryOperator::Exponential)),
         'v' | 'V' => Some(Key::UnaryOperator(UnaryOperator::Reciprocal)),
         'f' | 'F' => Some(Key::UnaryOperator(UnaryOperator::Factorial)),
+        'p' | 'P' => Some(Key::Constant(MathematicalConstant::Pi)),
+        'k' | 'K' => Some(Key::Constant(MathematicalConstant::Euler)),
         _ => None,
     }
 }
@@ -127,6 +131,14 @@ mod tests {
         assert_eq!(
             key_from_character('^'),
             Some(Key::Operator(Operator::Power))
+        );
+        assert_eq!(
+            key_from_character('p'),
+            Some(Key::Constant(MathematicalConstant::Pi))
+        );
+        assert_eq!(
+            key_from_character('k'),
+            Some(Key::Constant(MathematicalConstant::Euler))
         );
         assert_eq!(key_from_character('x'), None);
     }

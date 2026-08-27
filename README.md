@@ -23,6 +23,7 @@ The calculator currently supports:
 - Arbitrary powers (`x^y`)
 - Reciprocals (`1/x`)
 - Factorials (`x!`)
+- Mathematical constants (`π`, `e`)
 - Switchable degree and radian angle modes (`DEG`/`RAD`)
 - Decimal numbers
 - Clearing and deleting input
@@ -55,6 +56,8 @@ The calculator can be operated with the mouse or keyboard:
 | `E` | Calculate e raised to the current value |
 | `V` | Calculate the reciprocal |
 | `F` | Calculate the factorial |
+| `P` | Enter π |
+| `K` | Enter Euler's number e |
 
 ## Requirements
 

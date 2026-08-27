@@ -2,7 +2,7 @@
 
 use eframe::egui::{self, Align, Button, Color32, Layout, RichText, Vec2};
 
-use crate::calculator::{AngleMode, Operator, UnaryOperator};
+use crate::calculator::{AngleMode, MathematicalConstant, Operator, UnaryOperator};
 
 use super::formatting::{display_expression, display_size};
 use super::input::{Key, keyboard_keys};
@@ -12,6 +12,7 @@ const MIN_CALCULATOR_WIDTH: f32 = 300.0;
 const MAX_CALCULATOR_WIDTH: f32 = 420.0;
 const BUTTON_GAP: f32 = 9.0;
 const BUTTON_HEIGHT: f32 = 58.0;
+const BUTTON_ROW_GAP: f32 = 8.0;
 
 /// Connects the calculator state to the native egui application lifecycle.
 #[derive(Default)]
@@ -125,6 +126,8 @@ impl CalculatorApp {
         self.show_button_row(
             ui,
             &[
+                Key::Constant(MathematicalConstant::Pi),
+                Key::Constant(MathematicalConstant::Euler),
                 Key::UnaryOperator(UnaryOperator::ToggleSign),
                 Key::UnaryOperator(UnaryOperator::Percent),
                 Key::Clear,
@@ -193,7 +196,7 @@ impl CalculatorApp {
                 }
             }
         });
-        ui.add_space(8.0);
+        ui.add_space(BUTTON_ROW_GAP);
     }
 }
 
@@ -265,6 +268,11 @@ fn button_for(key: Key, active: bool, angle_mode: AngleMode) -> Button<'static> 
             .to_owned(),
             Color32::from_rgb(67, 80, 95),
             Color32::from_rgb(246, 249, 252),
+        ),
+        Key::Constant(constant) => (
+            constant.symbol().to_owned(),
+            Color32::from_rgb(48, 100, 145),
+            Color32::WHITE,
         ),
         Key::Equals => (
             "=".to_owned(),

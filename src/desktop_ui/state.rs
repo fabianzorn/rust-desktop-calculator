@@ -1,7 +1,8 @@
 //! Calculator interaction state independent of egui rendering.
 
 use crate::calculator::{
-    AngleMode, CalculationError, Operator, UnaryOperator, calculate, calculate_unary,
+    AngleMode, CalculationError, MathematicalConstant, Operator, UnaryOperator, calculate,
+    calculate_unary,
 };
 
 use super::formatting::{format_number, format_unary_expression};
@@ -60,6 +61,7 @@ impl CalculatorState {
             Key::Decimal => self.append_decimal(),
             Key::Operator(operator) => self.choose_operator(operator),
             Key::UnaryOperator(operator) => self.apply_unary_operator(operator),
+            Key::Constant(constant) => self.insert_constant(constant),
             Key::Equals => self.calculate_result(),
             Key::Backspace => self.backspace(),
             Key::Clear => self.clear(),
@@ -174,6 +176,20 @@ impl CalculatorState {
                 self.expression = unary_expression;
                 self.show_calculation_error(error);
             }
+        }
+    }
+
+    fn insert_constant(&mut self, constant: MathematicalConstant) {
+        self.clear_error();
+        self.display = format_number(constant.value());
+
+        if self.waiting_for_second_value {
+            self.waiting_for_second_value = false;
+            self.update_expression();
+        } else if self.first_value.is_some() && self.operator.is_some() {
+            self.update_expression();
+        } else {
+            self.expression = constant.symbol().to_owned();
         }
     }
 
@@ -647,6 +663,35 @@ mod tests {
             assert_eq!(state.expression, expression);
             assert!(!state.has_error);
         }
+    }
+
+    #[test]
+    fn inserts_mathematical_constants() {
+        let mut state = CalculatorState::default();
+        state.handle_key(Key::Constant(MathematicalConstant::Pi));
+        assert_eq!(state.display, std::f64::consts::PI.to_string());
+        assert_eq!(state.expression, "π");
+
+        state.handle_key(Key::Constant(MathematicalConstant::Euler));
+        assert_eq!(state.display, std::f64::consts::E.to_string());
+        assert_eq!(state.expression, "e");
+    }
+
+    #[test]
+    fn uses_constant_as_second_operand() {
+        let mut state = CalculatorState::default();
+        press_keys(
+            &mut state,
+            &[
+                Key::Number('2'),
+                Key::Operator(Operator::Multiply),
+                Key::Constant(MathematicalConstant::Pi),
+                Key::Equals,
+            ],
+        );
+
+        assert_eq!(state.display, (2.0 * std::f64::consts::PI).to_string());
+        assert_eq!(state.expression, format!("2 * {}", std::f64::consts::PI));
     }
 
     #[test]

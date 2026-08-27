@@ -25,6 +25,15 @@ pub enum AngleMode {
     Radians,
 }
 
+/// A mathematical constant that can be entered into the calculator.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MathematicalConstant {
+    /// The ratio of a circle's circumference to its diameter.
+    Pi,
+    /// Euler's number, the base of the natural logarithm.
+    Euler,
+}
+
 /// An arithmetic operation that acts on a single value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnaryOperator {
@@ -89,6 +98,24 @@ impl AngleMode {
         match self {
             Self::Degrees => value.to_radians(),
             Self::Radians => value,
+        }
+    }
+}
+
+impl MathematicalConstant {
+    /// Returns the constant's full-precision [`f64`] value.
+    pub fn value(self) -> f64 {
+        match self {
+            Self::Pi => std::f64::consts::PI,
+            Self::Euler => std::f64::consts::E,
+        }
+    }
+
+    /// Returns the symbol displayed by the calculator.
+    pub fn symbol(self) -> &'static str {
+        match self {
+            Self::Pi => "π",
+            Self::Euler => "e",
         }
     }
 }
@@ -198,9 +225,20 @@ pub enum CalculationError {
 
 #[cfg(test)]
 mod tests {
-    use std::f64::consts::{FRAC_PI_2, FRAC_PI_4, PI};
+    use std::f64::consts::{FRAC_PI_2, FRAC_PI_4, PI, E};
 
-    use super::{AngleMode, CalculationError, Operator, UnaryOperator, calculate, calculate_unary};
+    use super::{
+        AngleMode, CalculationError, MathematicalConstant, Operator, UnaryOperator, calculate,
+        calculate_unary,
+    };
+
+    #[test]
+    fn provides_mathematical_constants() {
+        assert_eq!(MathematicalConstant::Pi.value(), PI);
+        assert_eq!(MathematicalConstant::Pi.symbol(), "π");
+        assert_eq!(MathematicalConstant::Euler.value(), E);
+        assert_eq!(MathematicalConstant::Euler.symbol(), "e");
+    }
 
     #[test]
     fn adds_numbers() {
