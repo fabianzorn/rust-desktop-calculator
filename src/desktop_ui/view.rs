@@ -2,7 +2,7 @@
 
 use eframe::egui::{self, Align, Button, Color32, Layout, RichText, Vec2};
 
-use crate::calculator::{Operator, UnaryOperator};
+use crate::calculator::{AngleMode, Operator, UnaryOperator};
 
 use super::formatting::{display_expression, display_size};
 use super::input::{Key, keyboard_keys};
@@ -101,6 +101,7 @@ impl CalculatorApp {
                 Key::UnaryOperator(UnaryOperator::Sine),
                 Key::UnaryOperator(UnaryOperator::Cosine),
                 Key::UnaryOperator(UnaryOperator::Tangent),
+                Key::ToggleAngleMode,
             ],
         );
         self.show_button_row(
@@ -163,7 +164,11 @@ impl CalculatorApp {
                 if ui
                     .add_sized(
                         [button_width, BUTTON_HEIGHT],
-                        button_for(*key, self.state.is_active_operator(*key)),
+                        button_for(
+                            *key,
+                            self.state.is_active_operator(*key),
+                            self.state.angle_mode(),
+                        ),
                     )
                     .clicked()
                 {
@@ -196,7 +201,7 @@ fn show_header(ui: &mut egui::Ui) {
 }
 
 /// Creates a styled button for a calculator action.
-fn button_for(key: Key, active: bool) -> Button<'static> {
+fn button_for(key: Key, active: bool, angle_mode: AngleMode) -> Button<'static> {
     let (label, color, text_color) = match key {
         Key::Number(number) => (
             number.to_string(),
@@ -249,6 +254,11 @@ fn button_for(key: Key, active: bool) -> Button<'static> {
             "AC".to_owned(),
             Color32::from_rgb(150, 70, 78),
             Color32::from_rgb(255, 245, 245),
+        ),
+        Key::ToggleAngleMode => (
+            angle_mode.label().to_owned(),
+            Color32::from_rgb(48, 100, 145),
+            Color32::WHITE,
         ),
     };
 

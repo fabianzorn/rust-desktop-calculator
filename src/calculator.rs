@@ -13,6 +13,16 @@ pub enum Operator {
     Divide,
 }
 
+/// The unit used to interpret angles in trigonometric operations.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum AngleMode {
+    /// Interprets angles as degrees.
+    #[default]
+    Degrees,
+    /// Interprets angles as radians.
+    Radians,
+}
+
 /// An arithmetic operation that acts on a single value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnaryOperator {
@@ -24,11 +34,11 @@ pub enum UnaryOperator {
     SquareRoot,
     /// Multiplies the value by itself.
     Square,
-    /// Calculates the sine of an angle in degrees.
+    /// Calculates the sine of an angle in the selected unit.
     Sine,
-    /// Calculates the cosine of an angle in degrees.
+    /// Calculates the cosine of an angle in the selected unit.
     Cosine,
-    /// Calculates the tangent of an angle in degrees.
+    /// Calculates the tangent of an angle in the selected unit.
     Tangent,
 }
 
@@ -40,6 +50,32 @@ impl Operator {
             Self::Subtract => '-',
             Self::Multiply => '*',
             Self::Divide => '/',
+        }
+    }
+}
+
+impl AngleMode {
+    /// Returns the short label displayed by the angle-mode button.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Degrees => "DEG",
+            Self::Radians => "RAD",
+        }
+    }
+
+    /// Returns the other available angle mode.
+    pub fn toggled(self) -> Self {
+        match self {
+            Self::Degrees => Self::Radians,
+            Self::Radians => Self::Degrees,
+        }
+    }
+
+    /// Converts `value` from this angle unit to radians.
+    fn radians(self, value: f64) -> f64 {
+        match self {
+            Self::Degrees => value.to_radians(),
+            Self::Radians => value,
         }
     }
 }
@@ -59,31 +95,35 @@ pub fn calculate(first: f64, operator: Operator, second: f64) -> Result<f64, Cal
     }
 }
 
-/// Applies a unary `operator` to `value`.
+/// Applies a unary `operator` to `value`, using `angle_mode` for trigonometry.
 ///
 /// # Errors
 ///
 /// Returns an error when calculating the square root of a negative value or
 /// the tangent of an angle at which it is undefined.
-pub fn calculate_unary(value: f64, operator: UnaryOperator) -> Result<f64, CalculationError> {
+pub fn calculate_unary(
+    value: f64,
+    operator: UnaryOperator,
+    angle_mode: AngleMode,
+) -> Result<f64, CalculationError> {
     match operator {
         UnaryOperator::ToggleSign => Ok(-value),
         UnaryOperator::Percent => Ok(value / 100.0),
         UnaryOperator::SquareRoot if value < 0.0 => Err(CalculationError::NegativeSquareRoot),
         UnaryOperator::SquareRoot => Ok(value.sqrt()),
         UnaryOperator::Square => Ok(value.powi(2)),
-        UnaryOperator::Sine => Ok(round_trigonometric_result(value.to_radians().sin())),
-        UnaryOperator::Cosine => Ok(round_trigonometric_result(value.to_radians().cos())),
-        UnaryOperator::Tangent if tangent_is_undefined(value) => {
+        UnaryOperator::Sine => Ok(round_trigonometric_result(angle_mode.radians(value).sin())),
+        UnaryOperator::Cosine => Ok(round_trigonometric_result(angle_mode.radians(value).cos())),
+        UnaryOperator::Tangent if tangent_is_undefined(value, angle_mode) => {
             Err(CalculationError::UndefinedTangent)
         }
-        UnaryOperator::Tangent => Ok(round_trigonometric_result(value.to_radians().tan())),
+        UnaryOperator::Tangent => Ok(round_trigonometric_result(angle_mode.radians(value).tan())),
     }
 }
 
-/// Reports whether the tangent is undefined for an angle in degrees.
-fn tangent_is_undefined(degrees: f64) -> bool {
-    degrees.to_radians().cos().abs() < f64::EPSILON.sqrt()
+/// Reports whether the tangent is undefined for an angle in the selected unit.
+fn tangent_is_undefined(value: f64, angle_mode: AngleMode) -> bool {
+    angle_mode.radians(value).cos().abs() < f64::EPSILON.sqrt()
 }
 
 /// Rounds small floating-point artifacts produced by trigonometric functions.
@@ -106,7 +146,9 @@ pub enum CalculationError {
 
 #[cfg(test)]
 mod tests {
-    use super::{CalculationError, Operator, UnaryOperator, calculate, calculate_unary};
+    use std::f64::consts::{FRAC_PI_2, FRAC_PI_4, PI};
+
+    use super::{AngleMode, CalculationError, Operator, UnaryOperator, calculate, calculate_unary};
 
     #[test]
     fn adds_numbers() {
@@ -138,60 +180,125 @@ mod tests {
 
     #[test]
     fn toggles_number_sign() {
-        assert_eq!(calculate_unary(8.0, UnaryOperator::ToggleSign), Ok(-8.0));
-        assert_eq!(calculate_unary(-8.0, UnaryOperator::ToggleSign), Ok(8.0));
+        assert_eq!(
+            calculate_unary(8.0, UnaryOperator::ToggleSign, AngleMode::Degrees),
+            Ok(-8.0)
+        );
+        assert_eq!(
+            calculate_unary(-8.0, UnaryOperator::ToggleSign, AngleMode::Degrees),
+            Ok(8.0)
+        );
     }
 
     #[test]
     fn calculates_percentage() {
-        assert_eq!(calculate_unary(25.0, UnaryOperator::Percent), Ok(0.25));
+        assert_eq!(
+            calculate_unary(25.0, UnaryOperator::Percent, AngleMode::Degrees),
+            Ok(0.25)
+        );
     }
 
     #[test]
     fn calculates_square_root() {
-        assert_eq!(calculate_unary(81.0, UnaryOperator::SquareRoot), Ok(9.0));
+        assert_eq!(
+            calculate_unary(81.0, UnaryOperator::SquareRoot, AngleMode::Degrees),
+            Ok(9.0)
+        );
     }
 
     #[test]
     fn rejects_square_root_of_negative_number() {
         assert_eq!(
-            calculate_unary(-4.0, UnaryOperator::SquareRoot),
+            calculate_unary(-4.0, UnaryOperator::SquareRoot, AngleMode::Degrees),
             Err(CalculationError::NegativeSquareRoot)
         );
     }
 
     #[test]
     fn calculates_square() {
-        assert_eq!(calculate_unary(12.0, UnaryOperator::Square), Ok(144.0));
+        assert_eq!(
+            calculate_unary(12.0, UnaryOperator::Square, AngleMode::Degrees),
+            Ok(144.0)
+        );
     }
 
     #[test]
     fn calculates_sine_in_degrees() {
-        assert_eq!(calculate_unary(30.0, UnaryOperator::Sine), Ok(0.5));
-        assert_eq!(calculate_unary(90.0, UnaryOperator::Sine), Ok(1.0));
+        assert_eq!(
+            calculate_unary(30.0, UnaryOperator::Sine, AngleMode::Degrees),
+            Ok(0.5)
+        );
+        assert_eq!(
+            calculate_unary(90.0, UnaryOperator::Sine, AngleMode::Degrees),
+            Ok(1.0)
+        );
     }
 
     #[test]
     fn calculates_cosine_in_degrees() {
-        assert_eq!(calculate_unary(60.0, UnaryOperator::Cosine), Ok(0.5));
-        assert_eq!(calculate_unary(180.0, UnaryOperator::Cosine), Ok(-1.0));
+        assert_eq!(
+            calculate_unary(60.0, UnaryOperator::Cosine, AngleMode::Degrees),
+            Ok(0.5)
+        );
+        assert_eq!(
+            calculate_unary(180.0, UnaryOperator::Cosine, AngleMode::Degrees),
+            Ok(-1.0)
+        );
     }
 
     #[test]
     fn calculates_tangent_in_degrees() {
-        assert_eq!(calculate_unary(45.0, UnaryOperator::Tangent), Ok(1.0));
-        assert_eq!(calculate_unary(180.0, UnaryOperator::Tangent), Ok(0.0));
+        assert_eq!(
+            calculate_unary(45.0, UnaryOperator::Tangent, AngleMode::Degrees),
+            Ok(1.0)
+        );
+        assert_eq!(
+            calculate_unary(180.0, UnaryOperator::Tangent, AngleMode::Degrees),
+            Ok(0.0)
+        );
     }
 
     #[test]
     fn rejects_tangent_at_undefined_angles() {
         assert_eq!(
-            calculate_unary(90.0, UnaryOperator::Tangent),
+            calculate_unary(90.0, UnaryOperator::Tangent, AngleMode::Degrees),
             Err(CalculationError::UndefinedTangent)
         );
         assert_eq!(
-            calculate_unary(270.0, UnaryOperator::Tangent),
+            calculate_unary(270.0, UnaryOperator::Tangent, AngleMode::Degrees),
             Err(CalculationError::UndefinedTangent)
         );
+    }
+
+    #[test]
+    fn calculates_trigonometry_in_radians() {
+        assert_eq!(
+            calculate_unary(FRAC_PI_2, UnaryOperator::Sine, AngleMode::Radians),
+            Ok(1.0)
+        );
+        assert_eq!(
+            calculate_unary(PI, UnaryOperator::Cosine, AngleMode::Radians),
+            Ok(-1.0)
+        );
+        assert_eq!(
+            calculate_unary(FRAC_PI_4, UnaryOperator::Tangent, AngleMode::Radians),
+            Ok(1.0)
+        );
+    }
+
+    #[test]
+    fn rejects_undefined_tangent_in_radians() {
+        assert_eq!(
+            calculate_unary(FRAC_PI_2, UnaryOperator::Tangent, AngleMode::Radians),
+            Err(CalculationError::UndefinedTangent)
+        );
+    }
+
+    #[test]
+    fn toggles_angle_mode() {
+        assert_eq!(AngleMode::Degrees.toggled(), AngleMode::Radians);
+        assert_eq!(AngleMode::Radians.toggled(), AngleMode::Degrees);
+        assert_eq!(AngleMode::Degrees.label(), "DEG");
+        assert_eq!(AngleMode::Radians.label(), "RAD");
     }
 }

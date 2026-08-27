@@ -1,6 +1,6 @@
 //! Formatting helpers for values and expressions shown by the UI.
 
-use crate::calculator::UnaryOperator;
+use crate::calculator::{AngleMode, UnaryOperator};
 
 /// Formats a numeric result for the main calculator display.
 pub(super) fn format_number(number: f64) -> String {
@@ -17,18 +17,26 @@ pub(super) fn format_number(number: f64) -> String {
     }
 }
 
-/// Formats a unary operation for the expression display.
-pub(super) fn format_unary_expression(value: f64, operator: UnaryOperator) -> String {
+/// Formats a unary operation for the expression display in the selected angle mode.
+pub(super) fn format_unary_expression(
+    value: f64,
+    operator: UnaryOperator,
+    angle_mode: AngleMode,
+) -> String {
     let value = format_number(value);
+    let angle = match angle_mode {
+        AngleMode::Degrees => format!("{value}°"),
+        AngleMode::Radians => format!("{value} rad"),
+    };
 
     match operator {
         UnaryOperator::ToggleSign => format!("-({value})"),
         UnaryOperator::Percent => format!("{value}%"),
         UnaryOperator::SquareRoot => format!("√({value})"),
         UnaryOperator::Square => format!("({value})²"),
-        UnaryOperator::Sine => format!("sin({value}°)"),
-        UnaryOperator::Cosine => format!("cos({value}°)"),
-        UnaryOperator::Tangent => format!("tan({value}°)"),
+        UnaryOperator::Sine => format!("sin({angle})"),
+        UnaryOperator::Cosine => format!("cos({angle})"),
+        UnaryOperator::Tangent => format!("tan({angle})"),
     }
 }
 
@@ -77,16 +85,24 @@ mod tests {
     #[test]
     fn formats_trigonometric_expressions_in_degrees() {
         assert_eq!(
-            format_unary_expression(30.0, UnaryOperator::Sine),
+            format_unary_expression(30.0, UnaryOperator::Sine, AngleMode::Degrees),
             "sin(30°)"
         );
         assert_eq!(
-            format_unary_expression(60.0, UnaryOperator::Cosine),
+            format_unary_expression(60.0, UnaryOperator::Cosine, AngleMode::Degrees),
             "cos(60°)"
         );
         assert_eq!(
-            format_unary_expression(45.0, UnaryOperator::Tangent),
+            format_unary_expression(45.0, UnaryOperator::Tangent, AngleMode::Degrees),
             "tan(45°)"
+        );
+    }
+
+    #[test]
+    fn formats_trigonometric_expressions_in_radians() {
+        assert_eq!(
+            format_unary_expression(1.5, UnaryOperator::Sine, AngleMode::Radians),
+            "sin(1.5 rad)"
         );
     }
 

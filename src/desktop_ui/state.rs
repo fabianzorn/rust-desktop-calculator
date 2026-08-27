@@ -1,6 +1,8 @@
 //! Calculator interaction state independent of egui rendering.
 
-use crate::calculator::{CalculationError, Operator, UnaryOperator, calculate, calculate_unary};
+use crate::calculator::{
+    AngleMode, CalculationError, Operator, UnaryOperator, calculate, calculate_unary,
+};
 
 use super::formatting::{format_number, format_unary_expression};
 use super::input::Key;
@@ -13,6 +15,7 @@ pub(super) struct CalculatorState {
     expression: String,
     waiting_for_second_value: bool,
     has_error: bool,
+    angle_mode: AngleMode,
 }
 
 impl Default for CalculatorState {
@@ -24,6 +27,7 @@ impl Default for CalculatorState {
             expression: String::new(),
             waiting_for_second_value: false,
             has_error: false,
+            angle_mode: AngleMode::default(),
         }
     }
 }
@@ -44,6 +48,11 @@ impl CalculatorState {
         self.has_error
     }
 
+    /// Returns the angle unit used by trigonometric operations.
+    pub(super) fn angle_mode(&self) -> AngleMode {
+        self.angle_mode
+    }
+
     /// Applies one button or keyboard action to the calculator state.
     pub(super) fn handle_key(&mut self, key: Key) {
         match key {
@@ -54,6 +63,7 @@ impl CalculatorState {
             Key::Equals => self.calculate_result(),
             Key::Backspace => self.backspace(),
             Key::Clear => self.clear(),
+            Key::ToggleAngleMode => self.toggle_angle_mode(),
         }
     }
 
@@ -147,9 +157,9 @@ impl CalculatorState {
             return;
         };
 
-        let unary_expression = format_unary_expression(value, operator);
+        let unary_expression = format_unary_expression(value, operator, self.angle_mode);
 
-        match calculate_unary(value, operator) {
+        match calculate_unary(value, operator, self.angle_mode) {
             Ok(result) => {
                 self.display = format_number(result);
                 self.has_error = false;
@@ -182,7 +192,12 @@ impl CalculatorState {
     }
 
     fn clear(&mut self) {
-        *self = Self::default();
+        self.reset_calculation();
+    }
+
+    /// Switches the angle unit without changing the current calculation.
+    fn toggle_angle_mode(&mut self) {
+        self.angle_mode = self.angle_mode.toggled();
     }
 
     fn current_number(&self) -> Option<f64> {
@@ -191,8 +206,17 @@ impl CalculatorState {
 
     fn clear_error(&mut self) {
         if self.has_error {
-            *self = Self::default();
+            self.reset_calculation();
         }
+    }
+
+    /// Resets calculation data while retaining the selected angle mode.
+    fn reset_calculation(&mut self) {
+        let angle_mode = self.angle_mode;
+        *self = Self {
+            angle_mode,
+            ..Self::default()
+        };
     }
 
     fn show_error(&mut self, message: &str) {
@@ -234,6 +258,16 @@ mod tests {
         }
     }
 
+    fn enter_number(state: &mut CalculatorState, number: &str) {
+        for character in number.chars() {
+            let key = match character {
+                '.' => Key::Decimal,
+                digit => Key::Number(digit),
+            };
+            state.handle_key(key);
+        }
+    }
+
     #[test]
     fn starts_with_zero_display_and_no_pending_operation() {
         let state = CalculatorState::default();
@@ -244,6 +278,7 @@ mod tests {
         assert_eq!(state.operator, None);
         assert!(!state.waiting_for_second_value);
         assert!(!state.has_error);
+        assert_eq!(state.angle_mode, AngleMode::Degrees);
     }
 
     #[test]
@@ -616,6 +651,36 @@ mod tests {
         );
         assert_eq!(state.display, "1");
         assert_eq!(state.expression, "tan(45°)");
+    }
+
+    #[test]
+    fn calculates_trigonometry_in_radians() {
+        let mut state = CalculatorState::default();
+        state.handle_key(Key::ToggleAngleMode);
+        enter_number(&mut state, "1.5707963267948966");
+        state.handle_key(Key::UnaryOperator(UnaryOperator::Sine));
+
+        assert_eq!(state.angle_mode, AngleMode::Radians);
+        assert_eq!(state.display, "1");
+        assert_eq!(state.expression, "sin(1.5707963267948966 rad)");
+    }
+
+    #[test]
+    fn angle_mode_survives_clear() {
+        let mut state = CalculatorState::default();
+        press_keys(
+            &mut state,
+            &[
+                Key::ToggleAngleMode,
+                Key::Number('4'),
+                Key::Number('2'),
+                Key::Clear,
+            ],
+        );
+
+        assert_eq!(state.angle_mode, AngleMode::Radians);
+        assert_eq!(state.display, "0");
+        assert_eq!(state.expression, "");
     }
 
     #[test]

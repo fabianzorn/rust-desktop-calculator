@@ -14,14 +14,15 @@ The calculator currently supports:
 - Percent calculations (`%`)
 - Square roots (`√`)
 - Squaring (`x²`)
-- Sine calculations in degrees (`sin`)
-- Cosine calculations in degrees (`cos`)
-- Tangent calculations in degrees (`tan`)
+- Sine calculations (`sin`)
+- Cosine calculations (`cos`)
+- Tangent calculations (`tan`)
+- Switchable degree and radian angle modes (`DEG`/`RAD`)
 - Decimal numbers
 - Clearing and deleting input
 - Chained calculations
 - Keyboard controls
-- Error handling for division by zero and square roots of negative numbers
+- Error handling for division by zero, negative square roots, and undefined tangents
 
 ## Keyboard controls
 
@@ -39,9 +40,10 @@ The calculator can be operated with the mouse or keyboard:
 | `R` | Calculate the square root |
 | `S` | Square the current value |
 | `N` | Toggle the sign |
-| `I` | Calculate the sine in degrees |
-| `C` | Calculate the cosine in degrees |
-| `T` | Calculate the tangent in degrees |
+| `I` | Calculate the sine in the selected angle mode |
+| `C` | Calculate the cosine in the selected angle mode |
+| `T` | Calculate the tangent in the selected angle mode |
+| `M` | Switch between degree and radian mode |
 
 ## Requirements
 

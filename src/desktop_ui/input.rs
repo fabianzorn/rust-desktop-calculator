@@ -21,6 +21,8 @@ pub(super) enum Key {
     Backspace,
     /// Resets the complete calculator state.
     Clear,
+    /// Switches between degree and radian angle modes.
+    ToggleAngleMode,
 }
 
 /// Collects all calculator actions triggered during the current input frame.
@@ -66,6 +68,7 @@ fn key_from_character(character: char) -> Option<Key> {
         'i' | 'I' => Some(Key::UnaryOperator(UnaryOperator::Sine)),
         'c' | 'C' => Some(Key::UnaryOperator(UnaryOperator::Cosine)),
         't' | 'T' => Some(Key::UnaryOperator(UnaryOperator::Tangent)),
+        'm' | 'M' => Some(Key::ToggleAngleMode),
         _ => None,
     }
 }
@@ -94,6 +97,7 @@ mod tests {
             key_from_character('t'),
             Some(Key::UnaryOperator(UnaryOperator::Tangent))
         );
+        assert_eq!(key_from_character('m'), Some(Key::ToggleAngleMode));
         assert_eq!(key_from_character('x'), None);
     }
 }
