@@ -24,6 +24,7 @@ The calculator currently supports:
 - Reciprocals (`1/x`)
 - Factorials (`x!`)
 - Mathematical constants (`π`, `e`)
+- Calculator memory (`MC`, `MR`, `M+`, `M−`)
 - Switchable degree and radian angle modes (`DEG`/`RAD`)
 - Decimal numbers
 - Clearing and deleting input
@@ -64,6 +65,10 @@ The calculator can be operated with the mouse or keyboard:
 | `P` | Enter π |
 | `K` | Enter Euler's number e |
 | `Ctrl+C` (`Cmd+C` on macOS) | Copy the current result |
+| `Ctrl+L` | Clear calculator memory (`MC`) |
+| `Ctrl+R` | Recall calculator memory (`MR`) |
+| `Ctrl+P` | Add the display to memory (`M+`) |
+| `Ctrl+Q` | Subtract the display from memory (`M−`) |
 
 ## Requirements
 

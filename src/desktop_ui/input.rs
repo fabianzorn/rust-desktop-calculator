@@ -17,6 +17,14 @@ pub(super) enum Key {
     UnaryOperator(UnaryOperator),
     /// Enters a mathematical constant.
     Constant(MathematicalConstant),
+    /// Clears the calculator memory.
+    MemoryClear,
+    /// Recalls the value stored in calculator memory.
+    MemoryRecall,
+    /// Adds the displayed value to calculator memory.
+    MemoryAdd,
+    /// Subtracts the displayed value from calculator memory.
+    MemorySubtract,
     /// Evaluates the pending binary operation.
     Equals,
     /// Removes the last digit from the current value.
@@ -51,6 +59,18 @@ pub(super) fn keyboard_keys(context: &egui::Context) -> Vec<Key> {
         }
         if input.key_pressed(egui::Key::Escape) || input.key_pressed(egui::Key::Delete) {
             keys.push(Key::Clear);
+        }
+        if input.modifiers.ctrl && input.key_pressed(egui::Key::L) {
+            keys.push(Key::MemoryClear);
+        }
+        if input.modifiers.ctrl && input.key_pressed(egui::Key::R) {
+            keys.push(Key::MemoryRecall);
+        }
+        if input.modifiers.ctrl && input.key_pressed(egui::Key::P) {
+            keys.push(Key::MemoryAdd);
+        }
+        if input.modifiers.ctrl && input.key_pressed(egui::Key::Q) {
+            keys.push(Key::MemorySubtract);
         }
 
         keys

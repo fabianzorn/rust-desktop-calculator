@@ -19,6 +19,7 @@ pub(super) struct CalculatorState {
     waiting_for_second_value: bool,
     has_error: bool,
     angle_mode: AngleMode,
+    memory: f64,
 }
 
 impl Default for CalculatorState {
@@ -31,6 +32,7 @@ impl Default for CalculatorState {
             waiting_for_second_value: false,
             has_error: false,
             angle_mode: AngleMode::default(),
+            memory: 0.0,
         }
     }
 }
@@ -56,6 +58,11 @@ impl CalculatorState {
         self.angle_mode
     }
 
+    /// Reports whether calculator memory currently contains a non-zero value.
+    pub(super) fn has_memory(&self) -> bool {
+        self.memory != 0.0
+    }
+
     /// Applies one button or keyboard action to the calculator state.
     pub(super) fn handle_key(&mut self, key: Key) {
         match key {
@@ -64,6 +71,10 @@ impl CalculatorState {
             Key::Operator(operator) => self.choose_operator(operator),
             Key::UnaryOperator(operator) => self.apply_unary_operator(operator),
             Key::Constant(constant) => self.insert_constant(constant),
+            Key::MemoryClear => self.clear_memory(),
+            Key::MemoryRecall => self.recall_memory(),
+            Key::MemoryAdd => self.update_memory(1.0),
+            Key::MemorySubtract => self.update_memory(-1.0),
             Key::Equals => self.calculate_result(),
             Key::Backspace => self.backspace(),
             Key::Clear => self.clear(),
@@ -195,6 +206,42 @@ impl CalculatorState {
         }
     }
 
+    fn clear_memory(&mut self) {
+        if !self.has_error {
+            self.memory = 0.0;
+        }
+    }
+
+    fn recall_memory(&mut self) {
+        if self.has_error {
+            return;
+        }
+
+        self.display = format_number(self.memory);
+        if self.waiting_for_second_value {
+            self.waiting_for_second_value = false;
+            self.update_expression();
+        } else if self.first_value.is_some() && self.operator.is_some() {
+            self.update_expression();
+        } else {
+            self.expression = "MR".to_owned();
+        }
+    }
+
+    fn update_memory(&mut self, direction: f64) {
+        if self.has_error {
+            return;
+        }
+        let Some(value) = self.current_number() else {
+            return;
+        };
+
+        let updated = self.memory + direction * value;
+        if updated.is_finite() {
+            self.memory = updated;
+        }
+    }
+
     fn backspace(&mut self) {
         self.clear_error();
 
@@ -231,8 +278,10 @@ impl CalculatorState {
     /// Resets calculation data while retaining the selected angle mode.
     fn reset_calculation(&mut self) {
         let angle_mode = self.angle_mode;
+        let memory = self.memory;
         *self = Self {
             angle_mode,
+            memory,
             ..Self::default()
         };
     }
@@ -301,6 +350,8 @@ mod tests {
         assert!(!state.waiting_for_second_value);
         assert!(!state.has_error);
         assert_eq!(state.angle_mode, AngleMode::Degrees);
+        assert_eq!(state.memory, 0.0);
+        assert!(!state.has_memory());
     }
 
     #[test]
@@ -703,6 +754,84 @@ mod tests {
 
         assert_eq!(state.display, (2.0 * std::f64::consts::PI).to_string());
         assert_eq!(state.expression, format!("2 * {}", std::f64::consts::PI));
+    }
+
+    #[test]
+    fn adds_to_and_subtracts_from_memory() {
+        let mut state = CalculatorState::default();
+        enter_number(&mut state, "10");
+        state.handle_key(Key::MemoryAdd);
+        state.handle_key(Key::Clear);
+        enter_number(&mut state, "3");
+        state.handle_key(Key::MemorySubtract);
+
+        assert_eq!(state.memory, 7.0);
+        assert!(state.has_memory());
+
+        state.handle_key(Key::Clear);
+        state.handle_key(Key::MemoryRecall);
+        assert_eq!(state.display, "7");
+        assert_eq!(state.expression, "MR");
+    }
+
+    #[test]
+    fn memory_survives_clear_and_is_removed_by_memory_clear() {
+        let mut state = CalculatorState::default();
+        enter_number(&mut state, "5");
+        state.handle_key(Key::MemoryAdd);
+        state.handle_key(Key::Clear);
+
+        assert_eq!(state.memory, 5.0);
+        assert!(state.has_memory());
+
+        state.handle_key(Key::MemoryClear);
+        assert_eq!(state.memory, 0.0);
+        assert!(!state.has_memory());
+    }
+
+    #[test]
+    fn recalls_memory_as_second_operand() {
+        let mut state = CalculatorState::default();
+        enter_number(&mut state, "4");
+        state.handle_key(Key::MemoryAdd);
+        state.handle_key(Key::Clear);
+        press_keys(
+            &mut state,
+            &[
+                Key::Number('2'),
+                Key::Operator(Operator::Add),
+                Key::MemoryRecall,
+                Key::Equals,
+            ],
+        );
+
+        assert_eq!(state.display, "6");
+        assert_eq!(state.expression, "2 + 4");
+    }
+
+    #[test]
+    fn memory_operations_are_noops_during_errors() {
+        let mut state = CalculatorState::default();
+        enter_number(&mut state, "5");
+        state.handle_key(Key::MemoryAdd);
+        state.handle_key(Key::Clear);
+        press_keys(
+            &mut state,
+            &[
+                Key::Number('8'),
+                Key::Operator(Operator::Divide),
+                Key::Number('0'),
+                Key::Equals,
+                Key::MemoryAdd,
+                Key::MemorySubtract,
+                Key::MemoryRecall,
+                Key::MemoryClear,
+            ],
+        );
+
+        assert_eq!(state.display, "Cannot divide by zero");
+        assert_eq!(state.memory, 5.0);
+        assert!(state.has_memory());
     }
 
     #[test]

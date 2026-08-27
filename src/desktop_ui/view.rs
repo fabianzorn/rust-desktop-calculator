@@ -11,8 +11,8 @@ use super::state::CalculatorState;
 const MIN_CALCULATOR_WIDTH: f32 = 300.0;
 const MAX_CALCULATOR_WIDTH: f32 = 420.0;
 const BUTTON_GAP: f32 = 9.0;
-const BUTTON_HEIGHT: f32 = 58.0;
-const BUTTON_ROW_GAP: f32 = 8.0;
+const BUTTON_HEIGHT: f32 = 52.0;
+const BUTTON_ROW_GAP: f32 = 6.0;
 
 /// Connects the calculator state to the native egui application lifecycle.
 #[derive(Default)]
@@ -85,6 +85,16 @@ impl CalculatorApp {
                         .strong(),
                 )
                 .on_hover_text("Active angle mode (M to switch)");
+
+                if self.state.has_memory() {
+                    ui.label(
+                        RichText::new("M")
+                            .color(Color32::from_rgb(126, 214, 168))
+                            .size(12.0)
+                            .strong(),
+                    )
+                    .on_hover_text("Calculator memory contains a value");
+                }
             });
         });
     }
@@ -145,6 +155,15 @@ impl CalculatorApp {
 
     /// Renders all calculator button rows.
     fn show_buttons(&mut self, ui: &mut egui::Ui) {
+        self.show_button_row(
+            ui,
+            &[
+                Key::MemoryClear,
+                Key::MemoryRecall,
+                Key::MemoryAdd,
+                Key::MemorySubtract,
+            ],
+        );
         self.show_button_row(
             ui,
             &[
@@ -303,6 +322,18 @@ fn button_for(key: Key, active: bool, angle_mode: AngleMode) -> Button<'static> 
             Color32::from_rgb(48, 100, 145),
             Color32::WHITE,
         ),
+        Key::MemoryClear | Key::MemoryRecall | Key::MemoryAdd | Key::MemorySubtract => (
+            match key {
+                Key::MemoryClear => "MC",
+                Key::MemoryRecall => "MR",
+                Key::MemoryAdd => "M+",
+                Key::MemorySubtract => "M−",
+                _ => unreachable!(),
+            }
+            .to_owned(),
+            Color32::from_rgb(55, 91, 112),
+            Color32::from_rgb(226, 241, 249),
+        ),
         Key::Equals => (
             "=".to_owned(),
             Color32::from_rgb(42, 146, 103),
@@ -367,6 +398,10 @@ fn tooltip_for(key: Key) -> String {
             MathematicalConstant::Euler => "Enter Euler's number (K)",
         }
         .to_owned(),
+        Key::MemoryClear => "Clear memory (Ctrl+L)".to_owned(),
+        Key::MemoryRecall => "Recall memory (Ctrl+R)".to_owned(),
+        Key::MemoryAdd => "Add display to memory (Ctrl+P)".to_owned(),
+        Key::MemorySubtract => "Subtract display from memory (Ctrl+Q)".to_owned(),
         Key::Equals => "Calculate result (Enter or =)".to_owned(),
         Key::Backspace => "Delete last digit (Backspace)".to_owned(),
         Key::Clear => "Clear calculator (Escape or Delete)".to_owned(),
