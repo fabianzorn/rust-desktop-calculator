@@ -225,7 +225,7 @@ pub enum CalculationError {
 
 #[cfg(test)]
 mod tests {
-    use std::f64::consts::{FRAC_PI_2, FRAC_PI_4, PI, E};
+    use std::f64::consts::{E, FRAC_PI_2, FRAC_PI_4, PI};
 
     use super::{
         AngleMode, CalculationError, MathematicalConstant, Operator, UnaryOperator, calculate,

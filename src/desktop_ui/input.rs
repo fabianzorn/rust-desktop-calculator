@@ -30,14 +30,18 @@ pub(super) enum Key {
 /// Collects all calculator actions triggered during the current input frame.
 pub(super) fn keyboard_keys(context: &egui::Context) -> Vec<Key> {
     context.input(|input| {
-        let mut keys = input
-            .events
-            .iter()
-            .filter_map(|event| match event {
-                egui::Event::Text(text) => text.chars().find_map(key_from_character),
-                _ => None,
-            })
-            .collect::<Vec<_>>();
+        let mut keys = if input.modifiers.command {
+            Vec::new()
+        } else {
+            input
+                .events
+                .iter()
+                .filter_map(|event| match event {
+                    egui::Event::Text(text) => text.chars().find_map(key_from_character),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
 
         if input.key_pressed(egui::Key::Enter) {
             keys.push(Key::Equals);
@@ -51,6 +55,11 @@ pub(super) fn keyboard_keys(context: &egui::Context) -> Vec<Key> {
 
         keys
     })
+}
+
+/// Reports whether the platform's standard copy shortcut was pressed.
+pub(super) fn copy_result_requested(context: &egui::Context) -> bool {
+    context.input(|input| input.modifiers.command && input.key_pressed(egui::Key::C))
 }
 
 /// Maps a typed character to its calculator action.

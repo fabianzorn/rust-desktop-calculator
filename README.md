@@ -29,6 +29,11 @@ The calculator currently supports:
 - Clearing and deleting input
 - Chained calculations
 - Keyboard controls
+- Tooltips showing available keyboard shortcuts
+- Copying the current result
+- A persistent active angle-mode indicator
+- Manual input limited to 18 characters
+- Scientific notation for very large and very small results
 - Error handling for invalid mathematical domains and out-of-range results
 
 ## Keyboard controls
@@ -58,6 +63,7 @@ The calculator can be operated with the mouse or keyboard:
 | `F` | Calculate the factorial |
 | `P` | Enter π |
 | `K` | Enter Euler's number e |
+| `Ctrl+C` (`Cmd+C` on macOS) | Copy the current result |
 
 ## Requirements
 

@@ -5,7 +5,7 @@ use eframe::egui::{self, Align, Button, Color32, Layout, RichText, Vec2};
 use crate::calculator::{AngleMode, MathematicalConstant, Operator, UnaryOperator};
 
 use super::formatting::{display_expression, display_size};
-use super::input::{Key, keyboard_keys};
+use super::input::{Key, copy_result_requested, keyboard_keys};
 use super::state::CalculatorState;
 
 const MIN_CALCULATOR_WIDTH: f32 = 300.0;
@@ -24,6 +24,10 @@ impl eframe::App for CalculatorApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         ui.ctx().set_visuals(egui::Visuals::dark());
 
+        if copy_result_requested(ui.ctx()) {
+            self.copy_result(ui.ctx());
+        }
+
         for key in keyboard_keys(ui.ctx()) {
             self.state.handle_key(key);
         }
@@ -40,6 +44,51 @@ impl eframe::App for CalculatorApp {
 }
 
 impl CalculatorApp {
+    /// Copies the displayed result unless the calculator currently shows an error.
+    fn copy_result(&self, context: &egui::Context) {
+        if !self.state.has_error() {
+            context.copy_text(self.state.display().to_owned());
+        }
+    }
+
+    /// Renders the title, angle-mode status, and copy action.
+    fn show_header(&self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label(
+                RichText::new("Calculator")
+                    .color(Color32::from_rgb(244, 248, 251))
+                    .size(20.0)
+                    .strong(),
+            );
+
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                let copy = ui
+                    .add_enabled(
+                        !self.state.has_error(),
+                        Button::new(
+                            RichText::new("COPY")
+                                .color(Color32::from_rgb(220, 232, 242))
+                                .size(12.0),
+                        )
+                        .fill(Color32::from_rgb(49, 61, 74))
+                        .corner_radius(6.0),
+                    )
+                    .on_hover_text("Copy result (Ctrl+C / Cmd+C)");
+                if copy.clicked() {
+                    self.copy_result(ui.ctx());
+                }
+
+                ui.label(
+                    RichText::new(format!("ANGLE: {}", self.state.angle_mode().label()))
+                        .color(Color32::from_rgb(115, 183, 235))
+                        .size(12.0)
+                        .strong(),
+                )
+                .on_hover_text("Active angle mode (M to switch)");
+            });
+        });
+    }
+
     /// Renders the calculator container and all of its sections.
     fn show_calculator(&mut self, ui: &mut egui::Ui) {
         let calculator_width =
@@ -52,7 +101,7 @@ impl CalculatorApp {
             .inner_margin(18.0)
             .show(ui, |ui| {
                 ui.set_width(calculator_width);
-                show_header(ui);
+                self.show_header(ui);
                 ui.add_space(14.0);
                 self.show_display(ui);
                 ui.add_space(14.0);
@@ -181,7 +230,7 @@ impl CalculatorApp {
             ui.spacing_mut().item_spacing = Vec2::splat(BUTTON_GAP);
 
             for key in keys {
-                if ui
+                let response = ui
                     .add_sized(
                         [button_width, BUTTON_HEIGHT],
                         button_for(
@@ -190,34 +239,14 @@ impl CalculatorApp {
                             self.state.angle_mode(),
                         ),
                     )
-                    .clicked()
-                {
+                    .on_hover_text(tooltip_for(*key));
+                if response.clicked() {
                     self.state.handle_key(*key);
                 }
             }
         });
         ui.add_space(BUTTON_ROW_GAP);
     }
-}
-
-/// Renders the title and UI framework label.
-fn show_header(ui: &mut egui::Ui) {
-    ui.horizontal(|ui| {
-        ui.label(
-            RichText::new("Calculator")
-                .color(Color32::from_rgb(244, 248, 251))
-                .size(20.0)
-                .strong(),
-        );
-
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            ui.label(
-                RichText::new("egui")
-                    .color(Color32::from_rgb(133, 151, 169))
-                    .size(12.0),
-            );
-        });
-    });
 }
 
 /// Creates a styled button for a calculator action.
@@ -303,6 +332,46 @@ fn button_for(key: Key, active: bool, angle_mode: AngleMode) -> Button<'static> 
             Color32::from_rgba_unmultiplied(255, 255, 255, 24),
         ))
         .corner_radius(10.0)
+}
+
+/// Returns a short description and keyboard shortcut for a calculator key.
+fn tooltip_for(key: Key) -> String {
+    match key {
+        Key::Number(number) => format!("Enter {number} ({number})"),
+        Key::Decimal => "Decimal point (. or ,)".to_owned(),
+        Key::Operator(operator) => match operator {
+            Operator::Add => "Addition (+)",
+            Operator::Subtract => "Subtraction (-)",
+            Operator::Multiply => "Multiplication (*)",
+            Operator::Divide => "Division (/)",
+            Operator::Power => "Power (^)",
+        }
+        .to_owned(),
+        Key::UnaryOperator(operator) => match operator {
+            UnaryOperator::ToggleSign => "Toggle sign (N)",
+            UnaryOperator::Percent => "Percentage (%)",
+            UnaryOperator::SquareRoot => "Square root (R)",
+            UnaryOperator::Square => "Square (S)",
+            UnaryOperator::Sine => "Sine (I)",
+            UnaryOperator::Cosine => "Cosine (C)",
+            UnaryOperator::Tangent => "Tangent (T)",
+            UnaryOperator::LogarithmBase10 => "Base-10 logarithm (O)",
+            UnaryOperator::NaturalLogarithm => "Natural logarithm (L)",
+            UnaryOperator::Exponential => "Exponential e^x (E)",
+            UnaryOperator::Reciprocal => "Reciprocal (V)",
+            UnaryOperator::Factorial => "Factorial (F)",
+        }
+        .to_owned(),
+        Key::Constant(constant) => match constant {
+            MathematicalConstant::Pi => "Enter pi (P)",
+            MathematicalConstant::Euler => "Enter Euler's number (K)",
+        }
+        .to_owned(),
+        Key::Equals => "Calculate result (Enter or =)".to_owned(),
+        Key::Backspace => "Delete last digit (Backspace)".to_owned(),
+        Key::Clear => "Clear calculator (Escape or Delete)".to_owned(),
+        Key::ToggleAngleMode => "Switch angle mode (M)".to_owned(),
+    }
 }
 
 /// Returns the background color used by number and decimal buttons.

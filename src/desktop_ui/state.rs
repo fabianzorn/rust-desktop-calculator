@@ -8,6 +8,8 @@ use crate::calculator::{
 use super::formatting::{format_number, format_unary_expression};
 use super::input::Key;
 
+const MAX_INPUT_LENGTH: usize = 18;
+
 /// Owns the displayed values and any pending arithmetic operation.
 pub(super) struct CalculatorState {
     first_value: Option<f64>,
@@ -86,7 +88,7 @@ impl CalculatorState {
             self.waiting_for_second_value = false;
         } else if self.display == "0" {
             self.display = number.to_string();
-        } else {
+        } else if self.display.len() < MAX_INPUT_LENGTH {
             self.display.push(number);
         }
 
@@ -99,7 +101,7 @@ impl CalculatorState {
         if self.waiting_for_second_value {
             self.display = "0.".to_owned();
             self.waiting_for_second_value = false;
-        } else if !self.display.contains('.') {
+        } else if !self.display.contains('.') && self.display.len() < MAX_INPUT_LENGTH {
             self.display.push('.');
         }
 
@@ -326,6 +328,15 @@ mod tests {
             ],
         );
         assert_eq!(state.display, "1.52");
+    }
+
+    #[test]
+    fn limits_manually_entered_numbers() {
+        let mut state = CalculatorState::default();
+        enter_number(&mut state, "12345678901234567890");
+
+        assert_eq!(state.display, "123456789012345678");
+        assert_eq!(state.display.len(), MAX_INPUT_LENGTH);
     }
 
     #[test]

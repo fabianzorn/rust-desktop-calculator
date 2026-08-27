@@ -2,6 +2,9 @@
 
 use crate::calculator::{AngleMode, UnaryOperator};
 
+const SCIENTIFIC_UPPER_LIMIT: f64 = 1_000_000_000_000.0;
+const SCIENTIFIC_LOWER_LIMIT: f64 = 0.000_000_001;
+
 /// Formats a numeric result for the main calculator display.
 pub(super) fn format_number(number: f64) -> String {
     if number == 0.0 {
@@ -9,11 +12,49 @@ pub(super) fn format_number(number: f64) -> String {
     }
 
     let formatted = number.to_string();
+    let absolute = number.abs();
+    if absolute >= SCIENTIFIC_UPPER_LIMIT || absolute < SCIENTIFIC_LOWER_LIMIT {
+        return format_scientific(&formatted);
+    }
 
     if formatted.ends_with(".0") {
         formatted.trim_end_matches(".0").to_owned()
     } else {
         formatted
+    }
+}
+
+/// Converts Rust's shortest lossless decimal representation to scientific notation.
+fn format_scientific(formatted: &str) -> String {
+    if let Some((mantissa, exponent)) = formatted.split_once('e') {
+        let exponent = exponent.parse::<i32>().unwrap_or_default();
+        return format!("{mantissa}e{exponent}");
+    }
+
+    let (sign, unsigned) = formatted
+        .strip_prefix('-')
+        .map_or(("", formatted), |value| ("-", value));
+    let (integer, fraction) = unsigned.split_once('.').unwrap_or((unsigned, ""));
+
+    if integer != "0" {
+        let digits = format!("{integer}{fraction}");
+        let significant = digits.trim_end_matches('0');
+        let exponent = integer.len() - 1;
+        return scientific_from_digits(sign, significant, exponent as i32);
+    }
+
+    let first_significant = fraction.find(|character| character != '0').unwrap_or(0);
+    let significant = fraction[first_significant..].trim_end_matches('0');
+    scientific_from_digits(sign, significant, -(first_significant as i32) - 1)
+}
+
+/// Places the decimal point after the first significant digit.
+fn scientific_from_digits(sign: &str, digits: &str, exponent: i32) -> String {
+    let (first, remaining) = digits.split_at(1);
+    if remaining.is_empty() {
+        format!("{sign}{first}e{exponent}")
+    } else {
+        format!("{sign}{first}.{remaining}e{exponent}")
     }
 }
 
@@ -85,6 +126,19 @@ mod tests {
     #[test]
     fn normalizes_negative_zero() {
         assert_eq!(format_number(-0.0), "0");
+    }
+
+    #[test]
+    fn uses_scientific_notation_for_large_and_small_numbers() {
+        assert_eq!(format_number(1_000_000_000_000.0), "1e12");
+        assert_eq!(format_number(-1_234_500_000_000.0), "-1.2345e12");
+        assert_eq!(format_number(0.000_000_000_25), "2.5e-10");
+    }
+
+    #[test]
+    fn keeps_regular_notation_between_scientific_limits() {
+        assert_eq!(format_number(999_999_999_999.0), "999999999999");
+        assert_eq!(format_number(0.000_000_001), "0.000000001");
     }
 
     #[test]
