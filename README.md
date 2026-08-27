@@ -24,6 +24,11 @@ The calculator currently supports:
 - Arbitrary powers (`x^y`)
 - Reciprocals (`1/x`)
 - Factorials (`x!`)
+- Modulo division (`mod`)
+- Scientific exponent entry (`x×10^y`)
+- Absolute values (`|x|`)
+- Floor and ceiling rounding
+- Hyperbolic sine, cosine, and tangent (`sinh`, `cosh`, `tanh`)
 - Mathematical constants (`π`, `e`)
 - Calculator memory (`MC`, `MR`, `M+`, `M−`)
 - Nested parenthesized expressions
@@ -50,6 +55,9 @@ input while standard mode is active.
 Use the mode switch above the display or press `F2` to change views. Switching
 to standard mode cancels an incomplete parenthesized expression; completed
 calculations, the selected angle mode, and calculator memory are retained.
+Both views use the same window height. Advanced mode expands the window
+horizontally and arranges its controls in an eight-column, six-row grid,
+whereas standard mode remains a compact four-column calculator.
 
 ## Keyboard controls
 
@@ -76,6 +84,14 @@ The calculator can be operated with the mouse or keyboard:
 | `E` | Calculate e raised to the current value |
 | `V` | Calculate the reciprocal |
 | `F` | Calculate the factorial |
+| `D` | Select modulo division |
+| `J` | Select scientific exponent entry (`x×10^y`) |
+| `A` | Calculate the absolute value |
+| `G` | Round down (`floor`) |
+| `B` | Round up (`ceil`) |
+| `H` | Calculate the hyperbolic sine |
+| `U` | Calculate the hyperbolic cosine |
+| `Y` | Calculate the hyperbolic tangent |
 | `P` | Enter π |
 | `K` | Enter Euler's number e |
 | `Ctrl+C` (`Cmd+C` on macOS) | Copy the current result |

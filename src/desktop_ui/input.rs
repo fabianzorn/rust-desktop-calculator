@@ -115,6 +115,14 @@ fn key_from_character(character: char) -> Option<Key> {
         'e' | 'E' => Some(Key::UnaryOperator(UnaryOperator::Exponential)),
         'v' | 'V' => Some(Key::UnaryOperator(UnaryOperator::Reciprocal)),
         'f' | 'F' => Some(Key::UnaryOperator(UnaryOperator::Factorial)),
+        'h' | 'H' => Some(Key::UnaryOperator(UnaryOperator::HyperbolicSine)),
+        'u' | 'U' => Some(Key::UnaryOperator(UnaryOperator::HyperbolicCosine)),
+        'y' | 'Y' => Some(Key::UnaryOperator(UnaryOperator::HyperbolicTangent)),
+        'a' | 'A' => Some(Key::UnaryOperator(UnaryOperator::AbsoluteValue)),
+        'g' | 'G' => Some(Key::UnaryOperator(UnaryOperator::Floor)),
+        'b' | 'B' => Some(Key::UnaryOperator(UnaryOperator::Ceiling)),
+        'd' | 'D' => Some(Key::Operator(Operator::Modulo)),
+        'j' | 'J' => Some(Key::Operator(Operator::ScientificNotation)),
         'p' | 'P' => Some(Key::Constant(MathematicalConstant::Pi)),
         'k' | 'K' => Some(Key::Constant(MathematicalConstant::Euler)),
         '(' => Some(Key::OpenParenthesis),
@@ -182,6 +190,38 @@ mod tests {
         );
         assert_eq!(key_from_character('('), Some(Key::OpenParenthesis));
         assert_eq!(key_from_character(')'), Some(Key::CloseParenthesis));
+        assert_eq!(
+            key_from_character('h'),
+            Some(Key::UnaryOperator(UnaryOperator::HyperbolicSine))
+        );
+        assert_eq!(
+            key_from_character('u'),
+            Some(Key::UnaryOperator(UnaryOperator::HyperbolicCosine))
+        );
+        assert_eq!(
+            key_from_character('y'),
+            Some(Key::UnaryOperator(UnaryOperator::HyperbolicTangent))
+        );
+        assert_eq!(
+            key_from_character('a'),
+            Some(Key::UnaryOperator(UnaryOperator::AbsoluteValue))
+        );
+        assert_eq!(
+            key_from_character('g'),
+            Some(Key::UnaryOperator(UnaryOperator::Floor))
+        );
+        assert_eq!(
+            key_from_character('b'),
+            Some(Key::UnaryOperator(UnaryOperator::Ceiling))
+        );
+        assert_eq!(
+            key_from_character('d'),
+            Some(Key::Operator(Operator::Modulo))
+        );
+        assert_eq!(
+            key_from_character('j'),
+            Some(Key::Operator(Operator::ScientificNotation))
+        );
         assert_eq!(key_from_character('x'), None);
     }
 }

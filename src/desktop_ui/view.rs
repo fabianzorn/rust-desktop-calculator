@@ -8,11 +8,18 @@ use super::formatting::{display_expression, display_size};
 use super::input::{Key, calculator_mode_toggle_requested, copy_result_requested, keyboard_keys};
 use super::state::CalculatorState;
 
-const MIN_CALCULATOR_WIDTH: f32 = 300.0;
-const MAX_CALCULATOR_WIDTH: f32 = 420.0;
+const STANDARD_MIN_CALCULATOR_WIDTH: f32 = 300.0;
+const STANDARD_MAX_CALCULATOR_WIDTH: f32 = 420.0;
+const ADVANCED_MIN_CALCULATOR_WIDTH: f32 = 600.0;
+const ADVANCED_MAX_CALCULATOR_WIDTH: f32 = 680.0;
 const BUTTON_GAP: f32 = 9.0;
 const BUTTON_HEIGHT: f32 = 52.0;
 const BUTTON_ROW_GAP: f32 = 6.0;
+
+pub(super) const STANDARD_MIN_WINDOW_SIZE: [f32; 2] = [340.0, 660.0];
+pub(super) const STANDARD_WINDOW_SIZE: [f32; 2] = [380.0, 700.0];
+const ADVANCED_MIN_WINDOW_SIZE: [f32; 2] = [640.0, 660.0];
+const ADVANCED_WINDOW_SIZE: [f32; 2] = [720.0, 700.0];
 
 /// Controls which set of calculator functions is visible and available.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -69,6 +76,7 @@ impl eframe::App for CalculatorApp {
         }
         if calculator_mode_toggle_requested(ui.ctx()) {
             self.set_mode(self.mode.toggled());
+            self.resize_for_mode(ui.ctx());
         }
 
         for key in keyboard_keys(ui.ctx()) {
@@ -95,6 +103,20 @@ impl CalculatorApp {
             self.state.handle_key(Key::Clear);
         }
         self.mode = mode;
+    }
+
+    /// Resizes the native window to the selected control layout.
+    fn resize_for_mode(&self, context: &egui::Context) {
+        let (minimum, size) = match self.mode {
+            CalculatorMode::Standard => (STANDARD_MIN_WINDOW_SIZE, STANDARD_WINDOW_SIZE),
+            CalculatorMode::Advanced => (ADVANCED_MIN_WINDOW_SIZE, ADVANCED_WINDOW_SIZE),
+        };
+        context.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(Vec2::new(
+            minimum[0], minimum[1],
+        )));
+        context.send_viewport_cmd(egui::ViewportCommand::InnerSize(Vec2::new(
+            size[0], size[1],
+        )));
     }
 
     /// Copies the displayed result unless the calculator currently shows an error.
@@ -169,6 +191,7 @@ impl CalculatorApp {
                 .on_hover_text("Show basic calculator controls (F2)");
             if standard.clicked() {
                 self.set_mode(CalculatorMode::Standard);
+                self.resize_for_mode(ui.ctx());
             }
 
             let advanced = ui
@@ -176,14 +199,22 @@ impl CalculatorApp {
                 .on_hover_text("Show scientific calculator controls (F2)");
             if advanced.clicked() {
                 self.set_mode(CalculatorMode::Advanced);
+                self.resize_for_mode(ui.ctx());
             }
         });
     }
 
     /// Renders the calculator container and all of its sections.
     fn show_calculator(&mut self, ui: &mut egui::Ui) {
-        let calculator_width =
-            (ui.available_width() - 40.0).clamp(MIN_CALCULATOR_WIDTH, MAX_CALCULATOR_WIDTH);
+        let (minimum_width, maximum_width) = match self.mode {
+            CalculatorMode::Standard => {
+                (STANDARD_MIN_CALCULATOR_WIDTH, STANDARD_MAX_CALCULATOR_WIDTH)
+            }
+            CalculatorMode::Advanced => {
+                (ADVANCED_MIN_CALCULATOR_WIDTH, ADVANCED_MAX_CALCULATOR_WIDTH)
+            }
+        };
+        let calculator_width = (ui.available_width() - 40.0).clamp(minimum_width, maximum_width);
 
         egui::Frame::default()
             .fill(Color32::from_rgb(35, 43, 53))
@@ -250,9 +281,8 @@ impl CalculatorApp {
                     Key::Backspace,
                 ],
             );
+            self.show_number_button_rows(ui);
         }
-
-        self.show_number_button_rows(ui);
     }
 
     /// Renders controls available only in advanced mode.
@@ -266,6 +296,8 @@ impl CalculatorApp {
                 Key::MemorySubtract,
                 Key::OpenParenthesis,
                 Key::CloseParenthesis,
+                Key::Clear,
+                Key::Backspace,
             ],
         );
         self.show_button_row(
@@ -274,6 +306,10 @@ impl CalculatorApp {
                 Key::UnaryOperator(UnaryOperator::Sine),
                 Key::UnaryOperator(UnaryOperator::Cosine),
                 Key::UnaryOperator(UnaryOperator::Tangent),
+                Key::UnaryOperator(UnaryOperator::HyperbolicSine),
+                Key::UnaryOperator(UnaryOperator::HyperbolicCosine),
+                Key::UnaryOperator(UnaryOperator::HyperbolicTangent),
+                Key::UnaryOperator(UnaryOperator::AbsoluteValue),
                 Key::ToggleAngleMode,
             ],
         );
@@ -284,6 +320,10 @@ impl CalculatorApp {
                 Key::UnaryOperator(UnaryOperator::NaturalLogarithm),
                 Key::UnaryOperator(UnaryOperator::Exponential),
                 Key::Operator(Operator::Power),
+                Key::Number('7'),
+                Key::Number('8'),
+                Key::Number('9'),
+                Key::Operator(Operator::Divide),
             ],
         );
         self.show_button_row(
@@ -293,6 +333,23 @@ impl CalculatorApp {
                 Key::UnaryOperator(UnaryOperator::Factorial),
                 Key::UnaryOperator(UnaryOperator::SquareRoot),
                 Key::UnaryOperator(UnaryOperator::Square),
+                Key::Number('4'),
+                Key::Number('5'),
+                Key::Number('6'),
+                Key::Operator(Operator::Multiply),
+            ],
+        );
+        self.show_button_row(
+            ui,
+            &[
+                Key::UnaryOperator(UnaryOperator::Floor),
+                Key::UnaryOperator(UnaryOperator::Ceiling),
+                Key::Operator(Operator::Modulo),
+                Key::Operator(Operator::ScientificNotation),
+                Key::Number('1'),
+                Key::Number('2'),
+                Key::Number('3'),
+                Key::Operator(Operator::Subtract),
             ],
         );
         self.show_button_row(
@@ -302,8 +359,10 @@ impl CalculatorApp {
                 Key::Constant(MathematicalConstant::Euler),
                 Key::UnaryOperator(UnaryOperator::ToggleSign),
                 Key::UnaryOperator(UnaryOperator::Percent),
-                Key::Clear,
-                Key::Backspace,
+                Key::Number('0'),
+                Key::Decimal,
+                Key::Equals,
+                Key::Operator(Operator::Add),
             ],
         );
     }
@@ -390,11 +449,12 @@ fn button_for(key: Key, active: bool, angle_mode: AngleMode) -> Button<'static> 
             Color32::from_rgb(246, 249, 252),
         ),
         Key::Operator(operator) => (
-            if operator == Operator::Power {
-                "x^y".to_owned()
-            } else {
-                operator.symbol().to_string()
-            },
+            match operator {
+                Operator::Power => "x^y",
+                Operator::ScientificNotation => "x×10^y",
+                _ => operator.symbol(),
+            }
+            .to_owned(),
             if active {
                 Color32::from_rgb(244, 248, 251)
             } else {
@@ -420,6 +480,12 @@ fn button_for(key: Key, active: bool, angle_mode: AngleMode) -> Button<'static> 
                 UnaryOperator::Exponential => "e^x",
                 UnaryOperator::Reciprocal => "1/x",
                 UnaryOperator::Factorial => "x!",
+                UnaryOperator::HyperbolicSine => "sinh",
+                UnaryOperator::HyperbolicCosine => "cosh",
+                UnaryOperator::HyperbolicTangent => "tanh",
+                UnaryOperator::AbsoluteValue => "|x|",
+                UnaryOperator::Floor => "floor",
+                UnaryOperator::Ceiling => "ceil",
             }
             .to_owned(),
             Color32::from_rgb(67, 80, 95),
@@ -493,6 +559,8 @@ fn tooltip_for(key: Key) -> String {
             Operator::Multiply => "Multiplication (*)",
             Operator::Divide => "Division (/)",
             Operator::Power => "Power (^)",
+            Operator::Modulo => "Modulo division (D)",
+            Operator::ScientificNotation => "Scientific exponent x×10^y (J)",
         }
         .to_owned(),
         Key::UnaryOperator(operator) => match operator {
@@ -508,6 +576,12 @@ fn tooltip_for(key: Key) -> String {
             UnaryOperator::Exponential => "Exponential e^x (E)",
             UnaryOperator::Reciprocal => "Reciprocal (V)",
             UnaryOperator::Factorial => "Factorial (F)",
+            UnaryOperator::HyperbolicSine => "Hyperbolic sine (H)",
+            UnaryOperator::HyperbolicCosine => "Hyperbolic cosine (U)",
+            UnaryOperator::HyperbolicTangent => "Hyperbolic tangent (Y)",
+            UnaryOperator::AbsoluteValue => "Absolute value (A)",
+            UnaryOperator::Floor => "Round down / floor (G)",
+            UnaryOperator::Ceiling => "Round up / ceil (B)",
         }
         .to_owned(),
         Key::Constant(constant) => match constant {
@@ -548,7 +622,10 @@ mod tests {
         assert!(mode.allows(Key::Clear));
 
         assert!(!mode.allows(Key::Operator(Operator::Power)));
+        assert!(!mode.allows(Key::Operator(Operator::Modulo)));
+        assert!(!mode.allows(Key::Operator(Operator::ScientificNotation)));
         assert!(!mode.allows(Key::UnaryOperator(UnaryOperator::Sine)));
+        assert!(!mode.allows(Key::UnaryOperator(UnaryOperator::HyperbolicSine)));
         assert!(!mode.allows(Key::Constant(MathematicalConstant::Pi)));
         assert!(!mode.allows(Key::MemoryRecall));
         assert!(!mode.allows(Key::OpenParenthesis));
@@ -560,7 +637,10 @@ mod tests {
         let mode = CalculatorMode::Advanced;
 
         assert!(mode.allows(Key::Operator(Operator::Power)));
+        assert!(mode.allows(Key::Operator(Operator::Modulo)));
+        assert!(mode.allows(Key::Operator(Operator::ScientificNotation)));
         assert!(mode.allows(Key::UnaryOperator(UnaryOperator::Sine)));
+        assert!(mode.allows(Key::UnaryOperator(UnaryOperator::HyperbolicSine)));
         assert!(mode.allows(Key::Constant(MathematicalConstant::Pi)));
         assert!(mode.allows(Key::MemoryRecall));
         assert!(mode.allows(Key::OpenParenthesis));

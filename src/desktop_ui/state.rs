@@ -410,10 +410,10 @@ impl CalculatorState {
     fn update_expression(&mut self) {
         let local_expression = match (self.first_value, self.operator) {
             (Some(first), Some(operator)) if self.waiting_for_second_value => {
-                format!("{first} {}", operator.symbol())
+                format_binary_expression(first, operator, None)
             }
             (Some(first), Some(operator)) => {
-                format!("{first} {} {}", operator.symbol(), self.display)
+                format_binary_expression(first, operator, Some(&self.display))
             }
             _ if self.value_entered && !self.parentheses.is_empty() => self.display.clone(),
             _ => String::new(),
@@ -424,6 +424,16 @@ impl CalculatorState {
         } else {
             self.expression = local_expression;
         }
+    }
+}
+
+/// Formats a pending or complete binary expression for the secondary display.
+fn format_binary_expression(first: f64, operator: Operator, second: Option<&str>) -> String {
+    match (operator, second) {
+        (Operator::ScientificNotation, Some(second)) => format!("{first} × 10^{second}"),
+        (Operator::ScientificNotation, None) => format!("{first} × 10^"),
+        (_, Some(second)) => format!("{first} {} {second}", operator.symbol()),
+        (_, None) => format!("{first} {}", operator.symbol()),
     }
 }
 
@@ -618,6 +628,36 @@ mod tests {
         );
         assert_eq!(state.display, "256");
         assert_eq!(state.expression, "2 ^ 8");
+    }
+
+    #[test]
+    fn calculates_modulo_and_scientific_notation() {
+        let mut modulo = CalculatorState::default();
+        press_keys(
+            &mut modulo,
+            &[
+                Key::Number('1'),
+                Key::Number('7'),
+                Key::Operator(Operator::Modulo),
+                Key::Number('5'),
+                Key::Equals,
+            ],
+        );
+        assert_eq!(modulo.display, "2");
+        assert_eq!(modulo.expression, "17 mod 5");
+
+        let mut scientific = CalculatorState::default();
+        press_keys(
+            &mut scientific,
+            &[
+                Key::Number('2'),
+                Key::Operator(Operator::ScientificNotation),
+                Key::Number('3'),
+                Key::Equals,
+            ],
+        );
+        assert_eq!(scientific.display, "2000");
+        assert_eq!(scientific.expression, "2 × 10^3");
     }
 
     #[test]
@@ -901,6 +941,39 @@ mod tests {
             assert_eq!(state.expression, expression);
             assert!(!state.has_error);
         }
+    }
+
+    #[test]
+    fn calculates_reference_image_functions() {
+        let cases = [
+            ("0", UnaryOperator::HyperbolicSine, "0", "sinh(0)"),
+            ("0", UnaryOperator::HyperbolicCosine, "1", "cosh(0)"),
+            ("0", UnaryOperator::HyperbolicTangent, "0", "tanh(0)"),
+            ("2.9", UnaryOperator::Floor, "2", "floor(2.9)"),
+            ("2.1", UnaryOperator::Ceiling, "3", "ceil(2.1)"),
+        ];
+
+        for (input, operator, result, expression) in cases {
+            let mut state = CalculatorState::default();
+            enter_number(&mut state, input);
+            state.handle_key(Key::UnaryOperator(operator));
+
+            assert_eq!(state.display, result);
+            assert_eq!(state.expression, expression);
+            assert!(!state.has_error);
+        }
+
+        let mut absolute = CalculatorState::default();
+        enter_number(&mut absolute, "2.5");
+        press_keys(
+            &mut absolute,
+            &[
+                Key::UnaryOperator(UnaryOperator::ToggleSign),
+                Key::UnaryOperator(UnaryOperator::AbsoluteValue),
+            ],
+        );
+        assert_eq!(absolute.display, "2.5");
+        assert_eq!(absolute.expression, "|-2.5|");
     }
 
     #[test]

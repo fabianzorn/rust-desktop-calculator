@@ -83,6 +83,12 @@ pub(super) fn format_unary_expression(
         UnaryOperator::Exponential => format!("e^({value})"),
         UnaryOperator::Reciprocal => format!("1/({value})"),
         UnaryOperator::Factorial => format!("({value})!"),
+        UnaryOperator::HyperbolicSine => format!("sinh({value})"),
+        UnaryOperator::HyperbolicCosine => format!("cosh({value})"),
+        UnaryOperator::HyperbolicTangent => format!("tanh({value})"),
+        UnaryOperator::AbsoluteValue => format!("|{value}|"),
+        UnaryOperator::Floor => format!("floor({value})"),
+        UnaryOperator::Ceiling => format!("ceil({value})"),
     }
 }
 
@@ -186,6 +192,22 @@ mod tests {
         assert_eq!(
             format_unary_expression(5.0, UnaryOperator::Factorial, AngleMode::Degrees),
             "(5)!"
+        );
+        assert_eq!(
+            format_unary_expression(1.0, UnaryOperator::HyperbolicSine, AngleMode::Degrees),
+            "sinh(1)"
+        );
+        assert_eq!(
+            format_unary_expression(-2.0, UnaryOperator::AbsoluteValue, AngleMode::Degrees),
+            "|-2|"
+        );
+        assert_eq!(
+            format_unary_expression(2.5, UnaryOperator::Floor, AngleMode::Degrees),
+            "floor(2.5)"
+        );
+        assert_eq!(
+            format_unary_expression(2.5, UnaryOperator::Ceiling, AngleMode::Degrees),
+            "ceil(2.5)"
         );
     }
 

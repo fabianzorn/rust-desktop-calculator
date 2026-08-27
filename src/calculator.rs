@@ -13,6 +13,10 @@ pub enum Operator {
     Divide,
     /// Raises the first operand to the power of the second.
     Power,
+    /// Calculates the remainder after division.
+    Modulo,
+    /// Multiplies the first operand by ten raised to the second operand.
+    ScientificNotation,
 }
 
 /// The unit used to interpret angles in trigonometric operations.
@@ -61,17 +65,31 @@ pub enum UnaryOperator {
     Reciprocal,
     /// Calculates the factorial of a non-negative integer.
     Factorial,
+    /// Calculates the hyperbolic sine of the value.
+    HyperbolicSine,
+    /// Calculates the hyperbolic cosine of the value.
+    HyperbolicCosine,
+    /// Calculates the hyperbolic tangent of the value.
+    HyperbolicTangent,
+    /// Calculates the absolute value.
+    AbsoluteValue,
+    /// Rounds the value down to the next integer.
+    Floor,
+    /// Rounds the value up to the next integer.
+    Ceiling,
 }
 
 impl Operator {
     /// Returns the symbol used to display this operator.
-    pub fn symbol(self) -> char {
+    pub fn symbol(self) -> &'static str {
         match self {
-            Self::Add => '+',
-            Self::Subtract => '-',
-            Self::Multiply => '*',
-            Self::Divide => '/',
-            Self::Power => '^',
+            Self::Add => "+",
+            Self::Subtract => "-",
+            Self::Multiply => "*",
+            Self::Divide => "/",
+            Self::Power => "^",
+            Self::Modulo => "mod",
+            Self::ScientificNotation => "×10^",
         }
     }
 }
@@ -135,6 +153,13 @@ pub fn calculate(first: f64, operator: Operator, second: f64) -> Result<f64, Cal
         Operator::Divide => Ok(first / second),
         Operator::Power if first == 0.0 && second < 0.0 => Err(CalculationError::DivisionByZero),
         Operator::Power => finite_result(first.powf(second), CalculationError::InvalidPower),
+        Operator::Modulo if second == 0.0 => Err(CalculationError::DivisionByZero),
+        Operator::Modulo => Ok(first % second),
+        Operator::ScientificNotation if first == 0.0 => Ok(0.0),
+        Operator::ScientificNotation => finite_result(
+            first * 10.0_f64.powf(second),
+            CalculationError::ResultOutOfRange,
+        ),
     }
 }
 
@@ -175,6 +200,16 @@ pub fn calculate_unary(
         }
         UnaryOperator::Factorial if value > 170.0 => Err(CalculationError::ResultOutOfRange),
         UnaryOperator::Factorial => Ok(factorial(value as u32)),
+        UnaryOperator::HyperbolicSine => {
+            finite_result(value.sinh(), CalculationError::ResultOutOfRange)
+        }
+        UnaryOperator::HyperbolicCosine => {
+            finite_result(value.cosh(), CalculationError::ResultOutOfRange)
+        }
+        UnaryOperator::HyperbolicTangent => Ok(value.tanh()),
+        UnaryOperator::AbsoluteValue => Ok(value.abs()),
+        UnaryOperator::Floor => Ok(value.floor()),
+        UnaryOperator::Ceiling => Ok(value.ceil()),
     }
 }
 
@@ -283,6 +318,31 @@ mod tests {
         assert_eq!(
             calculate(0.0, Operator::Power, -1.0),
             Err(CalculationError::DivisionByZero)
+        );
+    }
+
+    #[test]
+    fn calculates_modulo_and_scientific_notation() {
+        assert_eq!(calculate(17.0, Operator::Modulo, 5.0), Ok(2.0));
+        assert_eq!(
+            calculate(2.5, Operator::ScientificNotation, 3.0),
+            Ok(2500.0)
+        );
+        assert_eq!(
+            calculate(0.0, Operator::ScientificNotation, 1000.0),
+            Ok(0.0)
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_modulo_and_out_of_range_scientific_notation() {
+        assert_eq!(
+            calculate(17.0, Operator::Modulo, 0.0),
+            Err(CalculationError::DivisionByZero)
+        );
+        assert_eq!(
+            calculate(1.0e308, Operator::ScientificNotation, 2.0),
+            Err(CalculationError::ResultOutOfRange)
         );
     }
 
@@ -404,6 +464,38 @@ mod tests {
         assert_eq!(
             calculate_unary(171.0, UnaryOperator::Factorial, AngleMode::Degrees),
             Err(CalculationError::ResultOutOfRange)
+        );
+    }
+
+    #[test]
+    fn calculates_hyperbolic_functions() {
+        assert_eq!(
+            calculate_unary(0.0, UnaryOperator::HyperbolicSine, AngleMode::Degrees),
+            Ok(0.0)
+        );
+        assert_eq!(
+            calculate_unary(0.0, UnaryOperator::HyperbolicCosine, AngleMode::Degrees),
+            Ok(1.0)
+        );
+        assert_eq!(
+            calculate_unary(0.0, UnaryOperator::HyperbolicTangent, AngleMode::Degrees),
+            Ok(0.0)
+        );
+    }
+
+    #[test]
+    fn calculates_absolute_value_floor_and_ceiling() {
+        assert_eq!(
+            calculate_unary(-2.5, UnaryOperator::AbsoluteValue, AngleMode::Degrees),
+            Ok(2.5)
+        );
+        assert_eq!(
+            calculate_unary(-2.5, UnaryOperator::Floor, AngleMode::Degrees),
+            Ok(-3.0)
+        );
+        assert_eq!(
+            calculate_unary(-2.5, UnaryOperator::Ceiling, AngleMode::Degrees),
+            Ok(-2.0)
         );
     }
 
