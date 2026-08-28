@@ -66,6 +66,42 @@ impl CalculatorMode {
             Self::Programmer => Self::Standard,
         }
     }
+
+    /// Returns the label shown in the mode selector.
+    fn label(self) -> &'static str {
+        match self {
+            Self::Standard => "STANDARD",
+            Self::Advanced => "ADVANCED",
+            Self::Programmer => "PROGRAMMER",
+        }
+    }
+
+    /// Returns the explanatory text shown when hovering over this mode.
+    fn tooltip(self) -> &'static str {
+        match self {
+            Self::Standard => "Show basic calculator controls (F2)",
+            Self::Advanced => "Show scientific calculator controls (F2)",
+            Self::Programmer => "Show integer and bitwise controls (F2)",
+        }
+    }
+
+    /// Returns the calculator-content width limits for this mode.
+    fn calculator_widths(self) -> (f32, f32) {
+        match self {
+            Self::Standard => (STANDARD_MIN_CALCULATOR_WIDTH, STANDARD_MAX_CALCULATOR_WIDTH),
+            Self::Advanced | Self::Programmer => {
+                (ADVANCED_MIN_CALCULATOR_WIDTH, ADVANCED_MAX_CALCULATOR_WIDTH)
+            }
+        }
+    }
+
+    /// Returns the minimum and preferred native window sizes for this mode.
+    fn window_sizes(self) -> ([f32; 2], [f32; 2]) {
+        match self {
+            Self::Standard => (STANDARD_MIN_WINDOW_SIZE, STANDARD_WINDOW_SIZE),
+            Self::Advanced | Self::Programmer => (ADVANCED_MIN_WINDOW_SIZE, ADVANCED_WINDOW_SIZE),
+        }
+    }
 }
 
 /// Connects the calculator state to the native egui application lifecycle.
@@ -122,11 +158,7 @@ impl CalculatorApp {
 
     /// Resizes the native window to the selected control layout.
     fn resize_for_mode(&self, context: &egui::Context) {
-        let (minimum, size) = match self.mode {
-            CalculatorMode::Standard => (STANDARD_MIN_WINDOW_SIZE, STANDARD_WINDOW_SIZE),
-            CalculatorMode::Advanced => (ADVANCED_MIN_WINDOW_SIZE, ADVANCED_WINDOW_SIZE),
-            CalculatorMode::Programmer => (ADVANCED_MIN_WINDOW_SIZE, ADVANCED_WINDOW_SIZE),
-        };
+        let (minimum, size) = self.mode.window_sizes();
         context.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(Vec2::new(
             minimum[0], minimum[1],
         )));
@@ -211,45 +243,26 @@ impl CalculatorApp {
                     .strong(),
             );
 
-            let standard = ui
-                .selectable_label(self.mode == CalculatorMode::Standard, "STANDARD")
-                .on_hover_text("Show basic calculator controls (F2)");
-            if standard.clicked() {
-                self.set_mode(CalculatorMode::Standard);
-                self.resize_for_mode(ui.ctx());
-            }
-
-            let advanced = ui
-                .selectable_label(self.mode == CalculatorMode::Advanced, "ADVANCED")
-                .on_hover_text("Show scientific calculator controls (F2)");
-            if advanced.clicked() {
-                self.set_mode(CalculatorMode::Advanced);
-                self.resize_for_mode(ui.ctx());
-            }
-
-            let programmer = ui
-                .selectable_label(self.mode == CalculatorMode::Programmer, "PROGRAMMER")
-                .on_hover_text("Show integer and bitwise controls (F2)");
-            if programmer.clicked() {
-                self.set_mode(CalculatorMode::Programmer);
-                self.resize_for_mode(ui.ctx());
+            for mode in [
+                CalculatorMode::Standard,
+                CalculatorMode::Advanced,
+                CalculatorMode::Programmer,
+            ] {
+                if ui
+                    .selectable_label(self.mode == mode, mode.label())
+                    .on_hover_text(mode.tooltip())
+                    .clicked()
+                {
+                    self.set_mode(mode);
+                    self.resize_for_mode(ui.ctx());
+                }
             }
         });
     }
 
     /// Renders the calculator container and all of its sections.
     fn show_calculator(&mut self, ui: &mut egui::Ui) {
-        let (minimum_width, maximum_width) = match self.mode {
-            CalculatorMode::Standard => {
-                (STANDARD_MIN_CALCULATOR_WIDTH, STANDARD_MAX_CALCULATOR_WIDTH)
-            }
-            CalculatorMode::Advanced => {
-                (ADVANCED_MIN_CALCULATOR_WIDTH, ADVANCED_MAX_CALCULATOR_WIDTH)
-            }
-            CalculatorMode::Programmer => {
-                (ADVANCED_MIN_CALCULATOR_WIDTH, ADVANCED_MAX_CALCULATOR_WIDTH)
-            }
-        };
+        let (minimum_width, maximum_width) = self.mode.calculator_widths();
         let calculator_width = (ui.available_width() - 40.0).clamp(minimum_width, maximum_width);
 
         egui::Frame::default()
@@ -283,71 +296,41 @@ impl CalculatorApp {
 
     /// Renders the current expression and result display.
     fn show_display(&self, ui: &mut egui::Ui) {
-        egui::Frame::default()
-            .fill(Color32::from_rgb(11, 17, 24))
-            .stroke(egui::Stroke::new(1.0, Color32::from_rgb(61, 76, 90)))
-            .corner_radius(10.0)
-            .inner_margin(16.0)
-            .show(ui, |ui| {
-                ui.set_width(ui.available_width());
-                ui.set_min_height(90.0);
-                ui.with_layout(Layout::top_down(Align::RIGHT), |ui| {
-                    ui.label(
-                        RichText::new(display_expression(self.state.expression()))
-                            .color(Color32::from_rgb(143, 164, 183))
-                            .size(14.0),
-                    );
-
-                    let display_color = if self.state.has_error() {
-                        Color32::from_rgb(255, 189, 189)
-                    } else {
-                        Color32::from_rgb(247, 251, 255)
-                    };
-
-                    ui.add_space(8.0);
-                    ui.label(
-                        RichText::new(self.state.display())
-                            .color(display_color)
-                            .size(display_size(self.state.display()))
-                            .strong(),
-                    );
-                });
-            });
+        show_result_display(
+            ui,
+            DisplayContent {
+                expression: self.state.expression(),
+                value: self.state.display(),
+                has_error: self.state.has_error(),
+            },
+            DisplayStyle {
+                minimum_height: 90.0,
+                expression_size: 14.0,
+                value_size: display_size(self.state.display()),
+                value_spacing: 8.0,
+                monospace: false,
+            },
+        );
     }
 
     /// Renders the integer expression and active-base value in programmer mode.
     fn show_programmer_display(&self, ui: &mut egui::Ui) {
         let display = self.programmer.display();
-        egui::Frame::default()
-            .fill(Color32::from_rgb(11, 17, 24))
-            .stroke(egui::Stroke::new(1.0, Color32::from_rgb(61, 76, 90)))
-            .corner_radius(10.0)
-            .inner_margin(16.0)
-            .show(ui, |ui| {
-                ui.set_width(ui.available_width());
-                ui.set_min_height(70.0);
-                ui.with_layout(Layout::top_down(Align::RIGHT), |ui| {
-                    ui.label(
-                        RichText::new(display_expression(self.programmer.expression()))
-                            .color(Color32::from_rgb(143, 164, 183))
-                            .size(13.0)
-                            .monospace(),
-                    );
-                    let color = if self.programmer.has_error() {
-                        Color32::from_rgb(255, 189, 189)
-                    } else {
-                        Color32::from_rgb(247, 251, 255)
-                    };
-                    ui.add_space(4.0);
-                    ui.label(
-                        RichText::new(&display)
-                            .color(color)
-                            .size(programmer_display_size(&display))
-                            .strong()
-                            .monospace(),
-                    );
-                });
-            });
+        show_result_display(
+            ui,
+            DisplayContent {
+                expression: self.programmer.expression(),
+                value: &display,
+                has_error: self.programmer.has_error(),
+            },
+            DisplayStyle {
+                minimum_height: 70.0,
+                expression_size: 13.0,
+                value_size: programmer_display_size(&display),
+                value_spacing: 4.0,
+                monospace: true,
+            },
+        );
     }
 
     /// Renders base and word-size selectors for programmer mode.
@@ -753,6 +736,60 @@ impl CalculatorApp {
     }
 }
 
+/// Dynamic text rendered by a calculator result display.
+struct DisplayContent<'a> {
+    expression: &'a str,
+    value: &'a str,
+    has_error: bool,
+}
+
+/// Visual differences between regular and programmer result displays.
+struct DisplayStyle {
+    minimum_height: f32,
+    expression_size: f32,
+    value_size: f32,
+    value_spacing: f32,
+    monospace: bool,
+}
+
+/// Renders the shared expression-and-result display frame.
+fn show_result_display(ui: &mut egui::Ui, content: DisplayContent<'_>, style: DisplayStyle) {
+    egui::Frame::default()
+        .fill(Color32::from_rgb(11, 17, 24))
+        .stroke(egui::Stroke::new(1.0, Color32::from_rgb(61, 76, 90)))
+        .corner_radius(10.0)
+        .inner_margin(16.0)
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.set_min_height(style.minimum_height);
+            ui.with_layout(Layout::top_down(Align::RIGHT), |ui| {
+                let mut expression = RichText::new(display_expression(content.expression))
+                    .color(Color32::from_rgb(143, 164, 183))
+                    .size(style.expression_size);
+                if style.monospace {
+                    expression = expression.monospace();
+                }
+                ui.label(expression);
+
+                let value_color = if content.has_error {
+                    Color32::from_rgb(255, 189, 189)
+                } else {
+                    Color32::from_rgb(247, 251, 255)
+                };
+                let mut value = RichText::new(content.value)
+                    .color(value_color)
+                    .size(style.value_size)
+                    .strong();
+                if style.monospace {
+                    value = value.monospace();
+                }
+
+                ui.add_space(style.value_spacing);
+                ui.label(value);
+            });
+        });
+}
+
 /// Creates a styled button for a calculator action.
 fn button_for(key: Key, active: bool, angle_mode: AngleMode) -> Button<'static> {
     let (label, color, text_color) = match key {
@@ -857,13 +894,7 @@ fn button_for(key: Key, active: bool, angle_mode: AngleMode) -> Button<'static> 
         ),
     };
 
-    Button::new(RichText::new(label).color(text_color).size(20.0).strong())
-        .fill(color)
-        .stroke(egui::Stroke::new(
-            1.0,
-            Color32::from_rgba_unmultiplied(255, 255, 255, 24),
-        ))
-        .corner_radius(10.0)
+    styled_button(label, color, text_color, 20.0, 10.0)
 }
 
 /// Returns a short description and keyboard shortcut for a calculator key.
@@ -946,13 +977,29 @@ fn programmer_button_for(key: ProgrammerKey, active: bool) -> Button<'static> {
         Color32::WHITE
     };
 
-    Button::new(RichText::new(label).color(text_color).size(16.0).strong())
-        .fill(color)
-        .stroke(egui::Stroke::new(
-            1.0,
-            Color32::from_rgba_unmultiplied(255, 255, 255, 24),
-        ))
-        .corner_radius(8.0)
+    styled_button(label, color, text_color, 16.0, 8.0)
+}
+
+/// Applies the visual treatment shared by all calculator keypad buttons.
+fn styled_button(
+    label: String,
+    color: Color32,
+    text_color: Color32,
+    font_size: f32,
+    corner_radius: f32,
+) -> Button<'static> {
+    Button::new(
+        RichText::new(label)
+            .color(text_color)
+            .size(font_size)
+            .strong(),
+    )
+    .fill(color)
+    .stroke(egui::Stroke::new(
+        1.0,
+        Color32::from_rgba_unmultiplied(255, 255, 255, 24),
+    ))
+    .corner_radius(corner_radius)
 }
 
 /// Returns the description and shortcut for a programmer-mode key.
