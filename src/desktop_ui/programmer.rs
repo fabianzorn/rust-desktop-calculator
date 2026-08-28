@@ -126,6 +126,50 @@ impl ProgrammerOperator {
             Self::ShiftRight => ">>",
         }
     }
+
+    /// Applies this operation using the wrapping semantics of `word_size`.
+    fn calculate(
+        self,
+        first: u64,
+        second: u64,
+        word_size: WordSize,
+    ) -> Result<u64, ProgrammerCalculationError> {
+        let mask = word_size.mask();
+        let result = match self {
+            Self::Add => first.wrapping_add(second),
+            Self::Subtract => first.wrapping_sub(second),
+            Self::Multiply => first.wrapping_mul(second),
+            Self::Divide | Self::Modulo if second == 0 => {
+                return Err(ProgrammerCalculationError::DivisionByZero);
+            }
+            Self::Divide => first / second,
+            Self::Modulo => first % second,
+            Self::And => first & second,
+            Self::Or => first | second,
+            Self::Xor => first ^ second,
+            Self::ShiftLeft if second >= u64::from(word_size.bits()) => 0,
+            Self::ShiftLeft => first.wrapping_shl(second as u32),
+            Self::ShiftRight if second >= u64::from(word_size.bits()) => 0,
+            Self::ShiftRight => first.wrapping_shr(second as u32),
+        };
+
+        Ok(result & mask)
+    }
+}
+
+/// An error produced by a programmer-mode integer operation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ProgrammerCalculationError {
+    DivisionByZero,
+}
+
+impl ProgrammerCalculationError {
+    /// Returns the message shown in the programmer display.
+    fn message(self) -> &'static str {
+        match self {
+            Self::DivisionByZero => "Cannot divide by zero",
+        }
+    }
 }
 
 /// An input action understood by programmer mode.
@@ -324,41 +368,15 @@ impl ProgrammerState {
             format_value(second, self.base)
         );
 
-        let mask = self.word_size.mask();
-        let result = match operator {
-            ProgrammerOperator::Add => first.wrapping_add(second) & mask,
-            ProgrammerOperator::Subtract => first.wrapping_sub(second) & mask,
-            ProgrammerOperator::Multiply => first.wrapping_mul(second) & mask,
-            ProgrammerOperator::Divide if second == 0 => {
-                self.show_error("Cannot divide by zero");
+        let result = match operator.calculate(first, second, self.word_size) {
+            Ok(result) => result,
+            Err(error) => {
+                self.show_error(error.message());
                 return;
-            }
-            ProgrammerOperator::Divide => first / second,
-            ProgrammerOperator::Modulo if second == 0 => {
-                self.show_error("Cannot divide by zero");
-                return;
-            }
-            ProgrammerOperator::Modulo => first % second,
-            ProgrammerOperator::And => first & second,
-            ProgrammerOperator::Or => first | second,
-            ProgrammerOperator::Xor => first ^ second,
-            ProgrammerOperator::ShiftLeft => {
-                if second >= u64::from(self.word_size.bits()) {
-                    0
-                } else {
-                    first.wrapping_shl(second as u32) & mask
-                }
-            }
-            ProgrammerOperator::ShiftRight => {
-                if second >= u64::from(self.word_size.bits()) {
-                    0
-                } else {
-                    first.wrapping_shr(second as u32)
-                }
             }
         };
 
-        self.value = result & mask;
+        self.value = result;
         self.first_value = None;
         self.operator = None;
         self.waiting_for_second_value = false;

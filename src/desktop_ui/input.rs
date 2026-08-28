@@ -44,28 +44,14 @@ pub(super) enum Key {
 /// Collects all calculator actions triggered during the current input frame.
 pub(super) fn keyboard_keys(context: &egui::Context) -> Vec<Key> {
     context.input(|input| {
-        let mut keys = if input.modifiers.command {
-            Vec::new()
-        } else {
-            input
-                .events
-                .iter()
-                .filter_map(|event| match event {
-                    egui::Event::Text(text) => text.chars().find_map(key_from_character),
-                    _ => None,
-                })
-                .collect::<Vec<_>>()
-        };
-
-        if input.key_pressed(egui::Key::Enter) {
-            keys.push(Key::Equals);
-        }
-        if input.key_pressed(egui::Key::Backspace) {
-            keys.push(Key::Backspace);
-        }
-        if input.key_pressed(egui::Key::Escape) || input.key_pressed(egui::Key::Delete) {
-            keys.push(Key::Clear);
-        }
+        let mut keys = collect_text_and_edit_keys(
+            input,
+            input.modifiers.command,
+            key_from_character,
+            Key::Equals,
+            Key::Backspace,
+            Key::Clear,
+        );
         if input.modifiers.ctrl && input.key_pressed(egui::Key::L) {
             keys.push(Key::MemoryClear);
         }
@@ -96,28 +82,14 @@ pub(super) fn calculator_mode_toggle_requested(context: &egui::Context) -> bool 
 /// Collects programmer-mode actions triggered during the current input frame.
 pub(super) fn programmer_keyboard_keys(context: &egui::Context) -> Vec<ProgrammerKey> {
     context.input(|input| {
-        let mut keys = if input.modifiers.command || input.modifiers.ctrl {
-            Vec::new()
-        } else {
-            input
-                .events
-                .iter()
-                .filter_map(|event| match event {
-                    egui::Event::Text(text) => text.chars().find_map(programmer_key_from_character),
-                    _ => None,
-                })
-                .collect::<Vec<_>>()
-        };
-
-        if input.key_pressed(egui::Key::Enter) {
-            keys.push(ProgrammerKey::Equals);
-        }
-        if input.key_pressed(egui::Key::Backspace) {
-            keys.push(ProgrammerKey::Backspace);
-        }
-        if input.key_pressed(egui::Key::Escape) || input.key_pressed(egui::Key::Delete) {
-            keys.push(ProgrammerKey::Clear);
-        }
+        let mut keys = collect_text_and_edit_keys(
+            input,
+            input.modifiers.command || input.modifiers.ctrl,
+            programmer_key_from_character,
+            ProgrammerKey::Equals,
+            ProgrammerKey::Backspace,
+            ProgrammerKey::Clear,
+        );
         if input.modifiers.ctrl && input.key_pressed(egui::Key::B) {
             keys.push(ProgrammerKey::SetBase(NumberBase::Binary));
         }
@@ -133,6 +105,41 @@ pub(super) fn programmer_keyboard_keys(context: &egui::Context) -> Vec<Programme
 
         keys
     })
+}
+
+/// Collects text input and the editing keys shared by both calculator modes.
+fn collect_text_and_edit_keys<K: Copy>(
+    input: &egui::InputState,
+    suppress_text_input: bool,
+    map_character: fn(char) -> Option<K>,
+    equals: K,
+    backspace: K,
+    clear: K,
+) -> Vec<K> {
+    let mut keys = if suppress_text_input {
+        Vec::new()
+    } else {
+        input
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                egui::Event::Text(text) => text.chars().find_map(map_character),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+
+    if input.key_pressed(egui::Key::Enter) {
+        keys.push(equals);
+    }
+    if input.key_pressed(egui::Key::Backspace) {
+        keys.push(backspace);
+    }
+    if input.key_pressed(egui::Key::Escape) || input.key_pressed(egui::Key::Delete) {
+        keys.push(clear);
+    }
+
+    keys
 }
 
 /// Maps typed characters to programmer-mode actions.

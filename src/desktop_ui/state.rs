@@ -225,18 +225,7 @@ impl CalculatorState {
 
     fn insert_constant(&mut self, constant: MathematicalConstant) {
         self.clear_error();
-        self.display = format_number(constant.value());
-        self.value_entered = true;
-        self.grouped_operand = false;
-
-        if self.waiting_for_second_value {
-            self.waiting_for_second_value = false;
-            self.update_expression();
-        } else if self.first_value.is_some() && self.operator.is_some() {
-            self.update_expression();
-        } else {
-            self.set_standalone_expression(constant.symbol().to_owned());
-        }
+        self.insert_value(constant.value(), constant.symbol());
     }
 
     fn clear_memory(&mut self) {
@@ -250,16 +239,22 @@ impl CalculatorState {
             return;
         }
 
-        self.display = format_number(self.memory);
+        self.insert_value(self.memory, "MR");
+    }
+
+    /// Inserts a complete numeric value and updates its surrounding expression.
+    fn insert_value(&mut self, value: f64, standalone_expression: &str) {
+        self.display = format_number(value);
         self.value_entered = true;
         self.grouped_operand = false;
+
         if self.waiting_for_second_value {
             self.waiting_for_second_value = false;
             self.update_expression();
         } else if self.first_value.is_some() && self.operator.is_some() {
             self.update_expression();
         } else {
-            self.set_standalone_expression("MR".to_owned());
+            self.set_standalone_expression(standalone_expression.to_owned());
         }
     }
 
