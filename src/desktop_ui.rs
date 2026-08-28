@@ -2,6 +2,7 @@
 
 mod formatting;
 mod input;
+mod programmer;
 mod state;
 mod view;
 

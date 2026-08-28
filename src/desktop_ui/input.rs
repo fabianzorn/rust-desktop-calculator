@@ -4,6 +4,8 @@ use eframe::egui;
 
 use crate::calculator::{MathematicalConstant, Operator, UnaryOperator};
 
+use super::programmer::{NumberBase, ProgrammerKey, ProgrammerOperator};
+
 /// An action that can be triggered by a calculator button or keyboard input.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Key {
@@ -89,6 +91,70 @@ pub(super) fn copy_result_requested(context: &egui::Context) -> bool {
 /// Reports whether the calculator-view mode shortcut was pressed.
 pub(super) fn calculator_mode_toggle_requested(context: &egui::Context) -> bool {
     context.input(|input| input.key_pressed(egui::Key::F2))
+}
+
+/// Collects programmer-mode actions triggered during the current input frame.
+pub(super) fn programmer_keyboard_keys(context: &egui::Context) -> Vec<ProgrammerKey> {
+    context.input(|input| {
+        let mut keys = if input.modifiers.command || input.modifiers.ctrl {
+            Vec::new()
+        } else {
+            input
+                .events
+                .iter()
+                .filter_map(|event| match event {
+                    egui::Event::Text(text) => text.chars().find_map(programmer_key_from_character),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
+
+        if input.key_pressed(egui::Key::Enter) {
+            keys.push(ProgrammerKey::Equals);
+        }
+        if input.key_pressed(egui::Key::Backspace) {
+            keys.push(ProgrammerKey::Backspace);
+        }
+        if input.key_pressed(egui::Key::Escape) || input.key_pressed(egui::Key::Delete) {
+            keys.push(ProgrammerKey::Clear);
+        }
+        if input.modifiers.ctrl && input.key_pressed(egui::Key::B) {
+            keys.push(ProgrammerKey::SetBase(NumberBase::Binary));
+        }
+        if input.modifiers.ctrl && input.key_pressed(egui::Key::O) {
+            keys.push(ProgrammerKey::SetBase(NumberBase::Octal));
+        }
+        if input.modifiers.ctrl && input.key_pressed(egui::Key::D) {
+            keys.push(ProgrammerKey::SetBase(NumberBase::Decimal));
+        }
+        if input.modifiers.ctrl && input.key_pressed(egui::Key::H) {
+            keys.push(ProgrammerKey::SetBase(NumberBase::Hexadecimal));
+        }
+
+        keys
+    })
+}
+
+/// Maps typed characters to programmer-mode actions.
+fn programmer_key_from_character(character: char) -> Option<ProgrammerKey> {
+    match character {
+        '0'..='9' => Some(ProgrammerKey::Digit(character as u8 - b'0')),
+        'a'..='f' => Some(ProgrammerKey::Digit(character as u8 - b'a' + 10)),
+        'A'..='F' => Some(ProgrammerKey::Digit(character as u8 - b'A' + 10)),
+        '+' => Some(ProgrammerKey::Operator(ProgrammerOperator::Add)),
+        '-' => Some(ProgrammerKey::Operator(ProgrammerOperator::Subtract)),
+        '*' | '×' => Some(ProgrammerKey::Operator(ProgrammerOperator::Multiply)),
+        '/' | '÷' => Some(ProgrammerKey::Operator(ProgrammerOperator::Divide)),
+        '%' => Some(ProgrammerKey::Operator(ProgrammerOperator::Modulo)),
+        '&' => Some(ProgrammerKey::Operator(ProgrammerOperator::And)),
+        '|' => Some(ProgrammerKey::Operator(ProgrammerOperator::Or)),
+        '^' => Some(ProgrammerKey::Operator(ProgrammerOperator::Xor)),
+        '<' => Some(ProgrammerKey::Operator(ProgrammerOperator::ShiftLeft)),
+        '>' => Some(ProgrammerKey::Operator(ProgrammerOperator::ShiftRight)),
+        '~' => Some(ProgrammerKey::Not),
+        '=' => Some(ProgrammerKey::Equals),
+        _ => None,
+    }
 }
 
 /// Maps a typed character to its calculator action.
@@ -223,5 +289,19 @@ mod tests {
             Some(Key::Operator(Operator::ScientificNotation))
         );
         assert_eq!(key_from_character('x'), None);
+    }
+
+    #[test]
+    fn maps_programmer_keyboard_characters() {
+        assert_eq!(
+            programmer_key_from_character('F'),
+            Some(ProgrammerKey::Digit(15))
+        );
+        assert_eq!(
+            programmer_key_from_character('&'),
+            Some(ProgrammerKey::Operator(ProgrammerOperator::And))
+        );
+        assert_eq!(programmer_key_from_character('~'), Some(ProgrammerKey::Not));
+        assert_eq!(programmer_key_from_character('G'), None);
     }
 }

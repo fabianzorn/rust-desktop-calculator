@@ -6,7 +6,7 @@ A small desktop calculator written in Rust. The user interface is built with
 
 The calculator currently supports:
 
-- Switchable standard and advanced calculator views
+- Switchable standard, advanced, and programmer calculator views
 - Addition
 - Subtraction
 - Multiplication
@@ -42,6 +42,9 @@ The calculator currently supports:
 - A persistent active angle-mode indicator
 - Manual input limited to 18 characters
 - Scientific notation for very large and very small results
+- Binary, octal, decimal, and hexadecimal integer conversion
+- Configurable 8-, 16-, 32-, and 64-bit programmer arithmetic
+- Editable bit grid and bitwise logic, shifts, and complements
 - Error handling for invalid mathematical domains and out-of-range results
 
 ## Calculator modes
@@ -49,15 +52,23 @@ The calculator currently supports:
 The **standard** view contains the numeric keypad, the four basic arithmetic
 operations, sign and percent controls, and editing actions. The **advanced**
 view additionally exposes scientific operations, constants, memory, angle
-mode, and parentheses. Hidden advanced actions are also disabled for keyboard
-input while standard mode is active.
+mode, and parentheses. The **programmer** view provides integer calculations,
+simultaneous `BIN`/`OCT`/`DEC`/`HEX` conversions, selectable word sizes, an
+editable 64-bit grid, bitwise operations, shifts, and complements. Actions
+hidden by the current mode are also disabled for keyboard input.
+
+`1's C` flips every bit in the selected word and is equivalent to `NOT`.
+`2's C` additionally adds one, producing the modular negation used for signed
+integers. When the sign bit is set, the decimal conversion also shows the
+corresponding signed two's-complement value.
 
 Use the mode switch above the display or press `F2` to change views. Switching
-to standard mode cancels an incomplete parenthesized expression; completed
-calculations, the selected angle mode, and calculator memory are retained.
-Both views use the same window height. Advanced mode expands the window
-horizontally and arranges its controls in an eight-column, six-row grid,
-whereas standard mode remains a compact four-column calculator.
+away from advanced mode cancels an incomplete parenthesized expression;
+completed calculations, the selected angle mode, and calculator memory are
+retained. All views use the same window height. Advanced mode expands the
+window horizontally and arranges its controls in an eight-column, six-row
+grid, whereas standard mode remains a compact four-column calculator.
+Programmer mode uses the same wide window as advanced mode.
 
 ## Keyboard controls
 
@@ -100,7 +111,14 @@ The calculator can be operated with the mouse or keyboard:
 | `Ctrl+P` | Add the display to memory (`M+`) |
 | `Ctrl+Q` | Subtract the display from memory (`M−`) |
 | `(`, `)` | Open or close a parenthesized expression |
-| `F2` | Switch between standard and advanced view |
+| `F2` | Cycle through standard, advanced, and programmer view |
+| `0`-`9`, `A`-`F` | Enter a programmer digit when valid for the selected base |
+| `&`, `\|`, `^`, `~` | Programmer-mode AND, OR, XOR, and NOT |
+| `<`, `>` | Shift left or right in programmer mode |
+| `Ctrl+B` | Select binary input in programmer mode |
+| `Ctrl+O` | Select octal input in programmer mode |
+| `Ctrl+D` | Select decimal input in programmer mode |
+| `Ctrl+H` | Select hexadecimal input in programmer mode |
 
 ## Requirements
 
@@ -196,6 +214,7 @@ cargo build --locked --release
 │   ├── desktop_ui/
 │   │   ├── formatting.rs     # Number, expression, and display formatting
 │   │   ├── input.rs          # Keyboard input and calculator key mapping
+│   │   ├── programmer.rs     # Programmer-mode integer, base, and bit logic
 │   │   ├── state.rs          # Calculator state, interactions, and related tests
 │   │   └── view.rs           # egui layout, controls, and styling
 │   └── main.rs               # Application entry point

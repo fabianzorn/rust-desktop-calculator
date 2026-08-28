@@ -5,7 +5,11 @@ use eframe::egui::{self, Align, Button, Color32, Layout, RichText, Vec2};
 use crate::calculator::{AngleMode, MathematicalConstant, Operator, UnaryOperator};
 
 use super::formatting::{display_expression, display_size};
-use super::input::{Key, calculator_mode_toggle_requested, copy_result_requested, keyboard_keys};
+use super::input::{
+    Key, calculator_mode_toggle_requested, copy_result_requested, keyboard_keys,
+    programmer_keyboard_keys,
+};
+use super::programmer::{NumberBase, ProgrammerKey, ProgrammerOperator, ProgrammerState, WordSize};
 use super::state::CalculatorState;
 
 const STANDARD_MIN_CALCULATOR_WIDTH: f32 = 300.0;
@@ -29,6 +33,8 @@ enum CalculatorMode {
     Standard,
     /// Shows memory, grouping, constants, and scientific operations.
     Advanced,
+    /// Shows integer bases, bits, and programming operations.
+    Programmer,
 }
 
 impl CalculatorMode {
@@ -36,6 +42,7 @@ impl CalculatorMode {
     fn allows(self, key: Key) -> bool {
         match self {
             Self::Advanced => true,
+            Self::Programmer => false,
             Self::Standard => matches!(
                 key,
                 Key::Number(_)
@@ -55,7 +62,8 @@ impl CalculatorMode {
     fn toggled(self) -> Self {
         match self {
             Self::Standard => Self::Advanced,
-            Self::Advanced => Self::Standard,
+            Self::Advanced => Self::Programmer,
+            Self::Programmer => Self::Standard,
         }
     }
 }
@@ -64,6 +72,7 @@ impl CalculatorMode {
 #[derive(Default)]
 pub(super) struct CalculatorApp {
     state: CalculatorState,
+    programmer: ProgrammerState,
     mode: CalculatorMode,
 }
 
@@ -79,9 +88,15 @@ impl eframe::App for CalculatorApp {
             self.resize_for_mode(ui.ctx());
         }
 
-        for key in keyboard_keys(ui.ctx()) {
-            if self.mode.allows(key) {
-                self.state.handle_key(key);
+        if self.mode == CalculatorMode::Programmer {
+            for key in programmer_keyboard_keys(ui.ctx()) {
+                self.programmer.handle_key(key);
+            }
+        } else {
+            for key in keyboard_keys(ui.ctx()) {
+                if self.mode.allows(key) {
+                    self.state.handle_key(key);
+                }
             }
         }
 
@@ -99,7 +114,7 @@ impl eframe::App for CalculatorApp {
 impl CalculatorApp {
     /// Changes the available controls and safely cancels an inaccessible open group.
     fn set_mode(&mut self, mode: CalculatorMode) {
-        if mode == CalculatorMode::Standard && self.state.has_open_parentheses() {
+        if mode != CalculatorMode::Advanced && self.state.has_open_parentheses() {
             self.state.handle_key(Key::Clear);
         }
         self.mode = mode;
@@ -110,6 +125,7 @@ impl CalculatorApp {
         let (minimum, size) = match self.mode {
             CalculatorMode::Standard => (STANDARD_MIN_WINDOW_SIZE, STANDARD_WINDOW_SIZE),
             CalculatorMode::Advanced => (ADVANCED_MIN_WINDOW_SIZE, ADVANCED_WINDOW_SIZE),
+            CalculatorMode::Programmer => (ADVANCED_MIN_WINDOW_SIZE, ADVANCED_WINDOW_SIZE),
         };
         context.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(Vec2::new(
             minimum[0], minimum[1],
@@ -121,8 +137,14 @@ impl CalculatorApp {
 
     /// Copies the displayed result unless the calculator currently shows an error.
     fn copy_result(&self, context: &egui::Context) {
-        if !self.state.has_error() {
-            context.copy_text(self.state.display().to_owned());
+        match self.mode {
+            CalculatorMode::Programmer if !self.programmer.has_error() => {
+                context.copy_text(self.programmer.display());
+            }
+            CalculatorMode::Standard | CalculatorMode::Advanced if !self.state.has_error() => {
+                context.copy_text(self.state.display().to_owned());
+            }
+            _ => {}
         }
     }
 
@@ -139,7 +161,10 @@ impl CalculatorApp {
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 let copy = ui
                     .add_enabled(
-                        !self.state.has_error(),
+                        match self.mode {
+                            CalculatorMode::Programmer => !self.programmer.has_error(),
+                            _ => !self.state.has_error(),
+                        },
                         Button::new(
                             RichText::new("COPY")
                                 .color(Color32::from_rgb(220, 232, 242))
@@ -201,6 +226,14 @@ impl CalculatorApp {
                 self.set_mode(CalculatorMode::Advanced);
                 self.resize_for_mode(ui.ctx());
             }
+
+            let programmer = ui
+                .selectable_label(self.mode == CalculatorMode::Programmer, "PROGRAMMER")
+                .on_hover_text("Show integer and bitwise controls (F2)");
+            if programmer.clicked() {
+                self.set_mode(CalculatorMode::Programmer);
+                self.resize_for_mode(ui.ctx());
+            }
         });
     }
 
@@ -211,6 +244,9 @@ impl CalculatorApp {
                 (STANDARD_MIN_CALCULATOR_WIDTH, STANDARD_MAX_CALCULATOR_WIDTH)
             }
             CalculatorMode::Advanced => {
+                (ADVANCED_MIN_CALCULATOR_WIDTH, ADVANCED_MAX_CALCULATOR_WIDTH)
+            }
+            CalculatorMode::Programmer => {
                 (ADVANCED_MIN_CALCULATOR_WIDTH, ADVANCED_MAX_CALCULATOR_WIDTH)
             }
         };
@@ -227,9 +263,21 @@ impl CalculatorApp {
                 ui.add_space(8.0);
                 self.show_mode_switch(ui);
                 ui.add_space(12.0);
-                self.show_display(ui);
-                ui.add_space(14.0);
-                self.show_buttons(ui);
+                if self.mode == CalculatorMode::Programmer {
+                    self.show_programmer_display(ui);
+                    ui.add_space(8.0);
+                    self.show_programmer_settings(ui);
+                    ui.add_space(6.0);
+                    self.show_programmer_conversions(ui);
+                    ui.add_space(6.0);
+                    self.show_programmer_bits(ui);
+                    ui.add_space(8.0);
+                    self.show_programmer_buttons(ui);
+                } else {
+                    self.show_display(ui);
+                    ui.add_space(14.0);
+                    self.show_buttons(ui);
+                }
             });
     }
 
@@ -265,6 +313,276 @@ impl CalculatorApp {
                     );
                 });
             });
+    }
+
+    /// Renders the integer expression and active-base value in programmer mode.
+    fn show_programmer_display(&self, ui: &mut egui::Ui) {
+        let display = self.programmer.display();
+        egui::Frame::default()
+            .fill(Color32::from_rgb(11, 17, 24))
+            .stroke(egui::Stroke::new(1.0, Color32::from_rgb(61, 76, 90)))
+            .corner_radius(10.0)
+            .inner_margin(16.0)
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.set_min_height(70.0);
+                ui.with_layout(Layout::top_down(Align::RIGHT), |ui| {
+                    ui.label(
+                        RichText::new(display_expression(self.programmer.expression()))
+                            .color(Color32::from_rgb(143, 164, 183))
+                            .size(13.0)
+                            .monospace(),
+                    );
+                    let color = if self.programmer.has_error() {
+                        Color32::from_rgb(255, 189, 189)
+                    } else {
+                        Color32::from_rgb(247, 251, 255)
+                    };
+                    ui.add_space(4.0);
+                    ui.label(
+                        RichText::new(&display)
+                            .color(color)
+                            .size(programmer_display_size(&display))
+                            .strong()
+                            .monospace(),
+                    );
+                });
+            });
+    }
+
+    /// Renders base and word-size selectors for programmer mode.
+    fn show_programmer_settings(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("BASE").size(11.0).strong());
+            for base in [
+                NumberBase::Binary,
+                NumberBase::Octal,
+                NumberBase::Decimal,
+                NumberBase::Hexadecimal,
+            ] {
+                if ui
+                    .selectable_label(self.programmer.base() == base, base.label())
+                    .on_hover_text(format!("Use base {}", base.label()))
+                    .clicked()
+                {
+                    self.programmer.handle_key(ProgrammerKey::SetBase(base));
+                }
+            }
+
+            ui.separator();
+            ui.label(RichText::new("WORD").size(11.0).strong());
+            for word_size in [
+                WordSize::Bits8,
+                WordSize::Bits16,
+                WordSize::Bits32,
+                WordSize::Bits64,
+            ] {
+                if ui
+                    .selectable_label(self.programmer.word_size() == word_size, word_size.label())
+                    .on_hover_text(format!("Use {} integers", word_size.label()))
+                    .clicked()
+                {
+                    self.programmer.set_word_size(word_size);
+                }
+            }
+        });
+    }
+
+    /// Renders the current value simultaneously in all supported bases.
+    fn show_programmer_conversions(&mut self, ui: &mut egui::Ui) {
+        egui::Frame::default()
+            .fill(Color32::from_rgb(25, 32, 40))
+            .corner_radius(8.0)
+            .inner_margin(8.0)
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                egui::Grid::new("programmer_conversions")
+                    .num_columns(2)
+                    .spacing([12.0, 3.0])
+                    .show(ui, |ui| {
+                        for base in [
+                            NumberBase::Hexadecimal,
+                            NumberBase::Decimal,
+                            NumberBase::Octal,
+                            NumberBase::Binary,
+                        ] {
+                            if ui
+                                .selectable_label(self.programmer.base() == base, base.label())
+                                .on_hover_text(format!("Switch input to {}", base.label()))
+                                .clicked()
+                            {
+                                self.programmer.handle_key(ProgrammerKey::SetBase(base));
+                            }
+                            let conversion = if base == NumberBase::Decimal {
+                                let unsigned = self.programmer.conversion(base);
+                                let signed = self.programmer.signed_decimal_conversion();
+                                if signed.starts_with('-') {
+                                    format!("{unsigned}  (signed: {signed})")
+                                } else {
+                                    unsigned
+                                }
+                            } else {
+                                self.programmer.conversion(base)
+                            };
+                            ui.label(
+                                RichText::new(conversion)
+                                    .color(Color32::from_rgb(218, 228, 237))
+                                    .size(12.0)
+                                    .monospace(),
+                            );
+                            ui.end_row();
+                        }
+                    });
+            });
+    }
+
+    /// Renders a directly editable 64-bit representation of the current value.
+    fn show_programmer_bits(&mut self, ui: &mut egui::Ui) {
+        egui::Frame::default()
+            .fill(Color32::from_rgb(25, 32, 40))
+            .corner_radius(8.0)
+            .inner_margin(6.0)
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                let gap = 2.0;
+                let nibble_gap = 8.0;
+                let bit_width = (ui.available_width() - gap * 15.0 - nibble_gap * 3.0) / 16.0;
+
+                for row in 0..4 {
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = gap;
+                        let highest = 63 - row * 16;
+                        for offset in 0..16 {
+                            if offset > 0 && offset % 4 == 0 {
+                                ui.add_space(nibble_gap);
+                            }
+                            let bit = highest - offset;
+                            let available = self.programmer.bit_is_available(bit);
+                            let set = self.programmer.bit_is_set(bit);
+                            let button = Button::new(
+                                RichText::new(if set { "1" } else { "0" })
+                                    .monospace()
+                                    .size(12.0),
+                            )
+                            .fill(if set {
+                                Color32::from_rgb(48, 112, 160)
+                            } else {
+                                Color32::from_rgb(38, 48, 59)
+                            })
+                            .corner_radius(3.0);
+                            if ui
+                                .add_enabled_ui(available, |ui| {
+                                    ui.add_sized([bit_width, 18.0], button)
+                                })
+                                .inner
+                                .on_hover_text(format!("Toggle bit {bit}"))
+                                .clicked()
+                            {
+                                self.programmer.toggle_bit(bit);
+                            }
+                        }
+                    });
+                }
+            });
+    }
+
+    /// Renders the hexadecimal keypad and bitwise operation controls.
+    fn show_programmer_buttons(&mut self, ui: &mut egui::Ui) {
+        let rows = [
+            [
+                ProgrammerKey::Digit(10),
+                ProgrammerKey::Digit(11),
+                ProgrammerKey::Digit(12),
+                ProgrammerKey::Digit(13),
+                ProgrammerKey::Digit(7),
+                ProgrammerKey::Digit(8),
+                ProgrammerKey::Digit(9),
+                ProgrammerKey::Operator(ProgrammerOperator::Divide),
+            ],
+            [
+                ProgrammerKey::Digit(14),
+                ProgrammerKey::Digit(15),
+                ProgrammerKey::Operator(ProgrammerOperator::Modulo),
+                ProgrammerKey::Not,
+                ProgrammerKey::Digit(4),
+                ProgrammerKey::Digit(5),
+                ProgrammerKey::Digit(6),
+                ProgrammerKey::Operator(ProgrammerOperator::Multiply),
+            ],
+            [
+                ProgrammerKey::Operator(ProgrammerOperator::And),
+                ProgrammerKey::Operator(ProgrammerOperator::Or),
+                ProgrammerKey::Operator(ProgrammerOperator::Xor),
+                ProgrammerKey::OnesComplement,
+                ProgrammerKey::Digit(1),
+                ProgrammerKey::Digit(2),
+                ProgrammerKey::Digit(3),
+                ProgrammerKey::Operator(ProgrammerOperator::Subtract),
+            ],
+            [
+                ProgrammerKey::Operator(ProgrammerOperator::ShiftLeft),
+                ProgrammerKey::Operator(ProgrammerOperator::ShiftRight),
+                ProgrammerKey::TwosComplement,
+                ProgrammerKey::Clear,
+                ProgrammerKey::Digit(0),
+                ProgrammerKey::Backspace,
+                ProgrammerKey::Equals,
+                ProgrammerKey::Operator(ProgrammerOperator::Add),
+            ],
+        ];
+
+        for row in rows {
+            self.show_programmer_button_row(ui, &row);
+        }
+    }
+
+    /// Renders one programmer-mode keypad row.
+    fn show_programmer_button_row(&mut self, ui: &mut egui::Ui, keys: &[ProgrammerKey]) {
+        let gaps_width = BUTTON_GAP * keys.len().saturating_sub(1) as f32;
+        let button_width = (ui.available_width() - gaps_width) / keys.len() as f32;
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing = Vec2::splat(BUTTON_GAP);
+            for key in keys {
+                let enabled = match key {
+                    ProgrammerKey::Digit(digit) => self.programmer.base().accepts(*digit),
+                    _ => true,
+                };
+
+                let active = match key {
+                    ProgrammerKey::Operator(operator) => {
+                        self.programmer.is_active_operator(*operator)
+                    }
+                    _ => false,
+                };
+
+                let tooltip = match key {
+                    ProgrammerKey::Digit(digit) if !enabled => format!(
+                        "Digit {} is not valid in {} (base {})",
+                        programmer_digit_label(*digit),
+                        self.programmer.base().label(),
+                        match self.programmer.base() {
+                            NumberBase::Binary => 2,
+                            NumberBase::Octal => 8,
+                            NumberBase::Decimal => 10,
+                            NumberBase::Hexadecimal => 16,
+                        }
+                    ),
+                    _ => programmer_tooltip(*key),
+                };
+
+                let response = ui
+                    .add_enabled_ui(enabled, |ui| {
+                        ui.add_sized([button_width, 40.0], programmer_button_for(*key, active))
+                    })
+                    .inner
+                    .on_hover_text(tooltip);
+
+                if response.clicked() {
+                    self.programmer.handle_key(*key);
+                }
+            }
+        });
+        ui.add_space(4.0);
     }
 
     /// Renders all calculator button rows.
@@ -602,9 +920,93 @@ fn tooltip_for(key: Key) -> String {
     }
 }
 
+/// Creates a styled programmer-mode button.
+fn programmer_button_for(key: ProgrammerKey, active: bool) -> Button<'static> {
+    let (label, color) = match key {
+        ProgrammerKey::Digit(digit) => (programmer_digit_label(digit).to_string(), key_color()),
+        ProgrammerKey::Operator(operator) => (
+            operator.symbol().to_owned(),
+            if active {
+                Color32::from_rgb(244, 248, 251)
+            } else {
+                Color32::from_rgb(238, 135, 65)
+            },
+        ),
+        ProgrammerKey::Equals => ("=".to_owned(), Color32::from_rgb(42, 146, 103)),
+        ProgrammerKey::Clear => ("AC".to_owned(), Color32::from_rgb(150, 70, 78)),
+        ProgrammerKey::Backspace => ("DEL".to_owned(), Color32::from_rgb(67, 80, 95)),
+        ProgrammerKey::Not => ("NOT".to_owned(), Color32::from_rgb(55, 91, 112)),
+        ProgrammerKey::OnesComplement => ("1's C".to_owned(), Color32::from_rgb(55, 91, 112)),
+        ProgrammerKey::TwosComplement => ("2's C".to_owned(), Color32::from_rgb(55, 91, 112)),
+        ProgrammerKey::SetBase(base) => (base.label().to_owned(), Color32::from_rgb(48, 100, 145)),
+    };
+    let text_color = if active {
+        Color32::from_rgb(28, 36, 45)
+    } else {
+        Color32::WHITE
+    };
+
+    Button::new(RichText::new(label).color(text_color).size(16.0).strong())
+        .fill(color)
+        .stroke(egui::Stroke::new(
+            1.0,
+            Color32::from_rgba_unmultiplied(255, 255, 255, 24),
+        ))
+        .corner_radius(8.0)
+}
+
+/// Returns the description and shortcut for a programmer-mode key.
+fn programmer_tooltip(key: ProgrammerKey) -> String {
+    match key {
+        ProgrammerKey::Digit(digit) => format!("Enter {}", programmer_digit_label(digit)),
+        ProgrammerKey::Operator(operator) => match operator {
+            ProgrammerOperator::Add => "Wrapping addition (+)",
+            ProgrammerOperator::Subtract => "Wrapping subtraction (-)",
+            ProgrammerOperator::Multiply => "Wrapping multiplication (*)",
+            ProgrammerOperator::Divide => "Integer division (/)",
+            ProgrammerOperator::Modulo => "Integer remainder (%)",
+            ProgrammerOperator::And => "Bitwise AND (&)",
+            ProgrammerOperator::Or => "Bitwise OR (|)",
+            ProgrammerOperator::Xor => "Bitwise XOR (^)",
+            ProgrammerOperator::ShiftLeft => "Shift left (<)",
+            ProgrammerOperator::ShiftRight => "Shift right (>)",
+        }
+        .to_owned(),
+        ProgrammerKey::Equals => "Calculate result (Enter or =)".to_owned(),
+        ProgrammerKey::Clear => "Clear programmer calculation (Escape)".to_owned(),
+        ProgrammerKey::Backspace => "Delete last digit (Backspace)".to_owned(),
+        ProgrammerKey::Not => "Bitwise NOT (~): flip every bit in the selected word".to_owned(),
+        ProgrammerKey::OnesComplement => {
+            "One's complement: flip every bit (same result as NOT)".to_owned()
+        }
+        ProgrammerKey::TwosComplement => {
+            "Two's complement: flip every bit, then add 1 (integer negation)".to_owned()
+        }
+        ProgrammerKey::SetBase(base) => format!("Use {} input", base.label()),
+    }
+}
+
+/// Formats a programmer digit using the conventional upper-case hexadecimal notation.
+fn programmer_digit_label(digit: u8) -> char {
+    char::from_digit(u32::from(digit), 16)
+        .unwrap_or('0')
+        .to_ascii_uppercase()
+}
+
 /// Returns the background color used by number and decimal buttons.
 fn key_color() -> Color32 {
     Color32::from_rgb(49, 61, 74)
+}
+
+/// Chooses a compact font size for long binary programmer values.
+fn programmer_display_size(display: &str) -> f32 {
+    if display.len() > 60 {
+        13.0
+    } else if display.len() > 32 {
+        18.0
+    } else {
+        28.0
+    }
 }
 
 #[cfg(test)]
@@ -648,6 +1050,28 @@ mod tests {
     }
 
     #[test]
+    fn programmer_mode_uses_its_own_input_actions() {
+        let mode = CalculatorMode::Programmer;
+
+        assert!(!mode.allows(Key::Number('7')));
+        assert!(!mode.allows(Key::Operator(Operator::Add)));
+        assert!(!mode.allows(Key::UnaryOperator(UnaryOperator::Sine)));
+    }
+
+    #[test]
+    fn mode_shortcut_cycles_through_all_three_views() {
+        assert_eq!(CalculatorMode::Standard.toggled(), CalculatorMode::Advanced);
+        assert_eq!(
+            CalculatorMode::Advanced.toggled(),
+            CalculatorMode::Programmer
+        );
+        assert_eq!(
+            CalculatorMode::Programmer.toggled(),
+            CalculatorMode::Standard
+        );
+    }
+
+    #[test]
     fn calculator_starts_in_standard_mode() {
         let app = CalculatorApp::default();
         assert_eq!(app.mode, CalculatorMode::Standard);
@@ -667,5 +1091,12 @@ mod tests {
         assert_eq!(app.mode, CalculatorMode::Standard);
         assert!(!app.state.has_open_parentheses());
         assert_eq!(app.state.display(), "0");
+    }
+
+    #[test]
+    fn programmer_display_font_shrinks_for_binary_values() {
+        assert_eq!(programmer_display_size("1010"), 28.0);
+        assert_eq!(programmer_display_size(&"1".repeat(40)), 18.0);
+        assert_eq!(programmer_display_size(&"1".repeat(64)), 13.0);
     }
 }
